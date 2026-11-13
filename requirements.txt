@@ -1,0 +1,12 @@
+# PyTorch built with CUDA 13.0 (RTX 50-series / Blackwell needs a CUDA 12.8+ build).
+--extra-index-url https://download.pytorch.org/whl/cu130
+torch==2.14.1+cu130
+torchvision==0.29.1+cu130
+
+numpy==2.2.6
+pillow==12.3.0
+PyYAML==6.0.3
+
+# Development
+pytest==9.2.0
+ruff==0.17.5

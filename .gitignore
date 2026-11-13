@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+build/
+dist/
+
+# Virtual environment
+.venv/
+venv/
+
+# Data, cached features and model artifacts (never commit)
+data/
+checkpoints/
+outputs/
+runs/
+wandb/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.onnx
+*.npy
+*.npz
+*.h5
+
+# Images (only small documentation assets are allowed)
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.gif
+*.webp
+!docs/assets/**
+
+# Secrets
+.env
+.env.*
+*.key
+*.pem
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
