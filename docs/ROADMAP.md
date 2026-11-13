@@ -8,7 +8,7 @@ Trạng thái: ✅ xong · 🔄 đang làm · ⬜ chưa làm
 | # | Giai đoạn | Nhánh | Trạng thái |
 |---|-----------|-------|------------|
 | 1 | Khởi tạo dự án | `main` | ✅ |
-| 2 | Khảo sát và chọn dataset | `feat/dataset-survey` | ⬜ |
+| 2 | Khảo sát và chọn dataset | `feat/dataset-survey` | ✅ |
 | 3 | Tiền xử lý tiếng Việt và pipeline dữ liệu | `feat/preprocessing` | ⬜ |
 | 4 | Mô hình baseline, huấn luyện, đánh giá, suy luận | `feat/baseline-model` | ⬜ |
 | 5 | Mô hình nâng cao (attention, Transformer) | `feat/advanced-model` | ⬜ |
@@ -23,10 +23,10 @@ Trạng thái: ✅ xong · 🔄 đang làm · ⬜ chưa làm
 **Tiêu chí hoàn thành:** `python scripts/check_env.py` in đúng tên GPU và báo `GPU check: OK`;
 `pytest` chạy qua; `main` đã được đẩy lên GitHub.
 
-## Giai đoạn 2 – Khảo sát và chọn dataset
+## Giai đoạn 2 – Khảo sát và chọn dataset ✅
 
 - Khảo sát các bộ image captioning tiếng Việt, xác minh giấy phép tại nguồn gốc.
-- Chọn bộ tốt nhất tải được tự do; bộ cần ký thỏa thuận thì ghi lại kèm hướng dẫn xin.
+- Chọn UIT-OpenViIC (13.100 ảnh, 61.241 caption do người viết, tải tự do, dùng cho nghiên cứu).
 - `docs/DATASETS.md`, `scripts/download_data.py`, `scripts/verify_data.py`.
 
 **Tiêu chí hoàn thành:** dữ liệu tải về `data/` và qua kiểm tra (số ảnh, số caption, ảnh hỏng,
