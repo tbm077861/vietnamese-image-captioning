@@ -1,0 +1,20 @@
+# Baseline experiment: frozen ResNet-50 features + LSTM decoder.
+# Run every script from the repository root. Any value can be overridden on the command line,
+# for example:  python scripts/prepare_data.py --config configs/baseline_lstm.yaml text.level=syllable
+
+seed: 42
+run_name: baseline_lstm
+output_dir: outputs
+data_root: data
+device: auto                 # auto, cuda or cpu
+
+# Change this one line to switch dataset (see docs/DATASETS.md).
+dataset_config: configs/datasets/uit_openviic.yaml
+
+text:
+  level: word                # word (Vietnamese word segmentation) or syllable
+  lowercase: true
+  strip_punctuation: true
+  min_freq: 3                # tokens seen fewer times in train become <unk>
+  max_vocab_size: null
+  max_length: 30             # captions are truncated to this many tokens
