@@ -79,6 +79,9 @@ ruff check . ; ruff format .          # lint và định dạng code
 # Dữ liệu (xem docs/DATASETS.md)
 python scripts/download_data.py --config configs/datasets/uit_openviic.yaml
 python scripts/verify_data.py --config configs/datasets/uit_openviic.yaml
+
+# Tiền xử lý: chuẩn hóa, tách từ, từ điển (thêm key=value ở cuối để ghi đè cấu hình)
+python scripts/prepare_data.py --config configs/baseline_lstm.yaml
 ```
 
 ## Quy ước code
@@ -94,8 +97,9 @@ python scripts/verify_data.py --config configs/datasets/uit_openviic.yaml
 - **Đã xong:** Giai đoạn 1 – khởi tạo dự án (repo, cấu trúc, môi trường, `check_env.py`).
 - **Đã xong:** Giai đoạn 2 – chọn UIT-OpenViIC, script tải và kiểm tra dữ liệu, định dạng
   annotation thống nhất (xem [DATASETS.md](DATASETS.md)).
-- **Tiếp theo:** Giai đoạn 3 – tiền xử lý tiếng Việt và pipeline dữ liệu (xem
-  [ROADMAP.md](ROADMAP.md)).
+- **Đã xong:** Giai đoạn 3 – chuẩn hóa và tách từ tiếng Việt, từ điển, `Dataset` / collate /
+  sampler tái lập được (`src/vic/text/`, `src/vic/data/`).
+- **Tiếp theo:** Giai đoạn 4 – mô hình baseline (xem [ROADMAP.md](ROADMAP.md)).
 
 ## Quyết định đã chốt cho các giai đoạn tới
 

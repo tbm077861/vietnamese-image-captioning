@@ -45,6 +45,21 @@ python scripts/verify_data.py --config configs/datasets/uit_openviic.yaml
 Dữ liệu được tải về `data/` (khoảng 3,8 GB) và **không bao giờ được đưa lên repo**. Chi tiết
 khảo sát, số liệu kiểm tra và cách đổi sang dataset khác: [docs/DATASETS.md](docs/DATASETS.md).
 
+## Tiền xử lý
+
+```powershell
+python scripts/prepare_data.py --config configs/baseline_lstm.yaml
+```
+
+- Chuẩn hóa caption: Unicode NFC, chữ thường, bỏ dấu câu, thống nhất cách đặt dấu thanh
+  (`hoà` thành `hòa`, `thuỷ` thành `thủy`).
+- Tách từ tiếng Việt bằng `underthesea`; âm tiết của cùng một từ nối bằng dấu gạch dưới
+  (`cây_xanh`). Thêm `text.level=syllable` vào cuối lệnh để dùng mức âm tiết.
+- Từ điển chỉ xây từ tập train. Với ngưỡng tần suất 3: 3.482 token, tỉ lệ từ ngoài từ điển
+  1,25% trên val và 0,96% trên test.
+- Kết quả nằm ở `data/processed/uit_openviic/word_minfreq3/`: `captions.json`, `vocab.json`,
+  `stats.json`.
+
 ## Cấu trúc thư mục
 
 ```
