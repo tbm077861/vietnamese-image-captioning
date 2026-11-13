@@ -1,0 +1,39 @@
+# UIT-OpenViIC: open-domain Vietnamese image captioning, captions written by people.
+# 13,100 images / 61,241 captions, official train / dev / test splits.
+name: uit_openviic
+title: UIT-OpenViIC
+homepage: https://github.com/nghiangh/UIT-OpenViIC-dataset
+paper: https://doi.org/10.1016/j.image.2025.117430
+# No formal license file. The authors state the dataset "is publicly available for research
+# purposes and freely accessible"; the paper says "non-commercial research". Research use only.
+license: research-only (authors' statement, no formal license)
+
+format: filename_captions   # adapter in src/vic/data/sources.py
+image_dir: images
+annotation_files:
+  train: uit-openviic-annotation-train.json
+  dev: uit-openviic-annotation-dev.json
+  test: uit-openviic-annotation-test.json
+
+files:
+  - name: uit-openviic-annotation-train.json
+    gdrive_id: 1kOgUE3duQjxJ6aaXrEHN8YlPQxF08JxW
+    bytes: 4612180
+  - name: uit-openviic-annotation-dev.json
+    gdrive_id: 1eQbmeU5x3GL0_JO_mZgYKYNAFLvpCdL5
+    bytes: 1192514
+  - name: uit-openviic-annotation-test.json
+    gdrive_id: 126gNnTrh13AZ2mc51bEMvB29huwuSB98
+    bytes: 1145625
+  - name: images.zip
+    gdrive_id: 1eRWL751fGv4WPTg0dhBGMRbcUgh9xKA5
+    bytes: 3805342476
+    extract: true
+
+# Only used for splits the dataset does not provide (this one ships all three).
+splits:
+  val_ratio: 0.1
+  test_ratio: 0.1
+
+# Image ids to drop (for example files found unreadable by scripts/verify_data.py).
+exclude_images: []
