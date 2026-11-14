@@ -16,8 +16,11 @@ Trạng thái: ✅ xong · 🔄 đang làm · ⬜ chưa làm
 | 7 | Đánh giá tổng hợp và phân tích lỗi | `feat/evaluation` | ⬜ |
 | 8 | Demo Gradio và hoàn thiện README | `feat/demo` | ⬜ |
 
-Việc đầu tiên cần làm tiếp: **huấn luyện đầy đủ baseline** (lệnh ở mục Giai đoạn 6, bước 1). Nó
-không phụ thuộc Giai đoạn 5 và cho ra mốc so sánh cho mọi mô hình sau.
+Baseline đã huấn luyện đầy đủ: CIDEr val 0,4274 và BLEU-4 val 28,74 (beam 3); chi tiết và phân
+tích lỗi trong [RESULTS.md](RESULTS.md). Đây là mốc so sánh cho mọi mô hình sau.
+
+**Quy tắc đánh giá:** mọi lựa chọn mô hình, siêu tham số và cách giải mã chỉ dựa trên tập val.
+Tập test chỉ được dùng thêm một lần, để báo cáo mô hình cuối cùng.
 
 ## Giai đoạn 1 – Khởi tạo dự án ✅
 
@@ -37,8 +40,8 @@ Chuẩn hóa, tách từ, từ điển 3.482 token, `Dataset` / collate / sample
 
 ResNet-50 đóng băng + LSTM, cache đặc trưng float16, vòng huấn luyện (mixed precision,
 checkpoint, resume chính xác, log), BLEU / CIDEr / METEOR, `train.py`, `evaluate.py`,
-`predict.py`. Đã chạy thử 400 bước: loss 8,01 giảm còn 3,46; sau 1 epoch CIDEr val 0,2248.
-**Chưa huấn luyện đầy đủ.**
+`predict.py`, `summarize_run.py`. Baseline đã huấn luyện đầy đủ 30 epoch; kết quả trong
+[RESULTS.md](RESULTS.md).
 
 ---
 
@@ -85,11 +88,13 @@ bước thấy loss giảm trong 8 GB VRAM.
 
 ## Giai đoạn 6 – Huấn luyện đầy đủ và tinh chỉnh ⬜
 
-1. **Baseline đầy đủ** (khoảng 15 giây mỗi epoch, tối đa 30 epoch, có dừng sớm):
+1. **Baseline đầy đủ: đã xong** (30 epoch, khoảng 8 phút; kết quả trong `RESULTS.md`). Lệnh
+   dùng cho mọi mô hình sau cũng theo mẫu này, chỉ đánh giá trên val:
 
    ```powershell
-   python scripts/train.py --config configs/baseline_lstm.yaml
-   python scripts/evaluate.py --checkpoint outputs/baseline_lstm/checkpoints/best.pt --split test
+   python scripts/train.py --config configs/<thí nghiệm>.yaml
+   python scripts/evaluate.py --checkpoint outputs/<run>/checkpoints/best.pt --split val --beam-size 1 3
+   python scripts/summarize_run.py --run outputs/<run> --sample-split val
    ```
 
 2. Huấn luyện đầy đủ các mô hình của Giai đoạn 5 với cùng seed.
@@ -131,7 +136,7 @@ kết quả tương đương; có bảng so sánh các mô hình trên val.
 2. Ghim `gradio` trong `requirements.txt`; thêm lệnh chạy demo vào README.
 3. README hoàn chỉnh: bảng kết quả, vài ví dụ đúng và sai (ảnh nhỏ đặt trong `docs/assets/`),
    hạn chế đã biết, trích dẫn bộ dữ liệu.
-4. Quyết định của chủ dự án: có công bố checkpoint không. Mô hình học từ dữ liệu chỉ cho phép
-   nghiên cứu phi thương mại nên nếu công bố phải ghi rõ điều kiện đó.
+4. **Không công bố checkpoint** (đã chốt): mô hình học từ dữ liệu chỉ cho phép nghiên cứu phi
+   thương mại. Demo chạy cục bộ với checkpoint do người dùng tự huấn luyện.
 
 **Tiêu chí hoàn thành:** người mới làm theo README chạy được suy luận và demo từ checkpoint.

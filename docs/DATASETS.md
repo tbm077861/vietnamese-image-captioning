@@ -1,7 +1,11 @@
 # Dữ liệu
 
-Khảo sát thực hiện ngày 13/11/2026. Mọi thông tin giấy phép dưới đây được đọc tại nguồn gốc
-(README của tác giả, trang dataset, bài báo); bộ nào không có tuyên bố thì ghi rõ là không có.
+Khảo sát thực hiện ngày 13/11/2026.
+
+- **Bộ được chọn (UIT-OpenViIC) đã được xác minh trực tiếp tại nguồn:** README trong repo của
+  tác giả, các link tải, và số liệu đếm lại sau khi tải.
+- **Các bộ không dùng chưa được xác minh trực tiếp tại nguồn.** Thông tin về chúng đến từ một
+  lượt khảo sát sơ bộ và chỉ để tham khảo; xem cảnh báo ở mục tương ứng.
 
 ## Bộ được chọn: UIT-OpenViIC
 
@@ -17,13 +21,14 @@ Khảo sát thực hiện ngày 13/11/2026. Mọi thông tin giấy phép dướ
 
 Bộ dữ liệu **không có file giấy phép chính thức**. Căn cứ sử dụng là tuyên bố của tác giả:
 
-- README: *"The UIT-OpenViIC dataset is publicly available for research purposes and freely
-  accessible"*.
-- Bài báo (bản arXiv 2305.04166): *"available online for non-commercial research"*.
+- README trong repo của tác giả (đã đọc trực tiếp): *"The UIT-OpenViIC dataset is publicly
+  available for research purposes and freely accessible"*.
+- Bản arXiv của bài báo (2305.04166) được ghi nhận là có câu *"available online for
+  non-commercial research"*; câu này lấy từ lượt khảo sát, chưa đối chiếu lại với bài báo.
 
-Vì vậy dự án chỉ dùng bộ này cho **nghiên cứu phi thương mại**, không phân phối lại và không
-đưa dữ liệu lên repo. Ảnh do tác giả thu thập từ Google và Bing, bản quyền từng ảnh thuộc chủ
-sở hữu gốc. Khi dùng kết quả từ bộ này, hãy trích dẫn bài báo ở trên.
+Dự án chọn cách hiểu chặt hơn: chỉ dùng bộ này cho **nghiên cứu phi thương mại**, không phân
+phối lại, không đưa dữ liệu lên repo, và không công bố mô hình đã huấn luyện từ nó. Bản quyền
+từng ảnh thuộc chủ sở hữu gốc của ảnh. Khi dùng kết quả từ bộ này, hãy trích dẫn bài báo ở trên.
 
 ### Số liệu sau khi tải (đã kiểm tra bằng `scripts/verify_data.py`)
 
@@ -61,22 +66,30 @@ python scripts/verify_data.py --config configs/datasets/uit_openviic.yaml
 
 ## Các bộ đã khảo sát nhưng không dùng
 
-| Bộ | Quy mô (ảnh / caption) | Caption | Giấy phép tại nguồn | Cách lấy | Lý do không dùng |
+> **Chưa xác minh trực tiếp tại nguồn.** Mọi thông tin trong bảng dưới đây (quy mô, cách tạo
+> caption, giấy phép, cách lấy) được ghi lại từ một lượt khảo sát sơ bộ và chưa được kiểm tra
+> lại tại trang gốc của từng bộ. Cột giấy phép chỉ ghi điều lượt khảo sát tìm thấy, **không
+> phải khẳng định** về tình trạng pháp lý của bộ dữ liệu. Trước khi dùng bất kỳ bộ nào trong
+> bảng, phải tự đọc điều khoản tại nguồn của bộ đó.
+
+| Bộ | Quy mô được ghi nhận (ảnh / caption) | Caption | Ghi nhận về giấy phép (chưa xác minh) | Cách lấy được ghi nhận | Lý do không dùng |
 |---|---|---|---|---|---|
-| KTVIC | 4.327 / 21.635 | Người viết | Không có tuyên bố nào | Tải trực tiếp (GitHub, Drive) | Không có giấy phép hay tuyên bố sử dụng; ảnh lấy từ UIT-EVJVQA chưa rõ điều khoản |
-| UIT-ViIC | 3.850 / khoảng 19.250 | Người viết | Không có file giấy phép; trang của nhóm ghi "for research purposes" | Annotation tải trực tiếp, ảnh lấy từ MS COCO | Chỉ gồm ảnh thể thao với bóng, quy mô nhỏ. Là phương án dự phòng |
-| VieCap4H | 10.068 / 11.563 | Người viết | Thỏa thuận: chỉ dùng cho nghiên cứu học thuật, phi thương mại | Phải có tài khoản và ký thỏa thuận | Phải ký thỏa thuận; miền y tế hẹp; khoảng 1 caption mỗi ảnh |
-| Flickr30k bản tiếng Việt (Hugging Face) | 31.783 ảnh | Dịch, không rõ cách dịch | Thẻ `cc-by-4.0` do người tải lên gắn | Tải trực tiếp | Caption dịch chứ không phải viết bằng tiếng Việt; giấy phép chưa đối chiếu được với bản gốc |
-| COCO 2017 bản tiếng Việt (Hugging Face) | Theo COCO 2017 | Dịch máy | `unknown` | Tải trực tiếp | Dịch máy, không rõ giấy phép |
-| HVU_VIC | 29.970 / 29.970 | Sinh tự động | Thẻ `mit` | Tải trực tiếp | Caption do máy sinh |
-| XM3600 (phần tiếng Việt) | 3.600 ảnh | Người viết | Annotation CC BY 4.0 | Tải trực tiếp | Quá nhỏ để huấn luyện; phù hợp làm tập đánh giá bổ sung về sau |
+| KTVIC | 4.327 / 21.635 | Người viết | Chưa tìm thấy tuyên bố giấy phép | Tải trực tiếp | Chưa thấy căn cứ cho phép sử dụng; chưa rõ điều khoản của nguồn ảnh |
+| UIT-ViIC | 3.850 / khoảng 19.250 | Người viết | Chưa tìm thấy file giấy phép; trang của nhóm tác giả có nhắc "for research purposes" | Annotation tải trực tiếp, ảnh lấy từ MS COCO | Chỉ gồm ảnh thể thao với bóng, quy mô nhỏ. Có thể là phương án dự phòng sau khi xác minh |
+| VieCap4H | 10.068 / 11.563 | Người viết | Có vẻ yêu cầu thỏa thuận sử dụng cho nghiên cứu học thuật | Cần tài khoản và ký thỏa thuận | Phải ký thỏa thuận; miền y tế hẹp; khoảng 1 caption mỗi ảnh |
+| Flickr30k bản tiếng Việt (Hugging Face) | 31.783 ảnh | Dịch, chưa rõ cách dịch | Thẻ giấy phép do người tải lên gắn, chưa đối chiếu với bản gốc | Tải trực tiếp | Caption dịch chứ không phải viết bằng tiếng Việt; giấy phép chưa rõ |
+| COCO 2017 bản tiếng Việt (Hugging Face) | Theo COCO 2017 | Dịch máy | Chưa rõ | Tải trực tiếp | Caption dịch máy; giấy phép chưa rõ |
+| HVU_VIC | 29.970 / 29.970 | Sinh tự động | Thẻ giấy phép do người tải lên gắn, chưa đối chiếu | Tải trực tiếp | Caption do máy sinh |
+| XM3600 (phần tiếng Việt) | 3.600 ảnh | Người viết | Được ghi nhận là annotation theo CC BY 4.0, chưa đối chiếu | Tải trực tiếp | Quá nhỏ để huấn luyện; có thể làm tập đánh giá bổ sung sau khi xác minh |
 
-Không có bộ nào tốt hơn UIT-OpenViIC mà phải ký thỏa thuận. Bộ duy nhất cần thỏa thuận là
-VieCap4H; nếu sau này muốn thử miền y tế:
+Trong lượt khảo sát, không thấy bộ nào tốt hơn UIT-OpenViIC mà phải ký thỏa thuận. Bộ duy nhất
+được ghi nhận là cần thỏa thuận là VieCap4H. Nếu sau này muốn thử miền y tế, các bước dưới đây
+cũng **chưa được xác minh** và cần kiểm tra lại tại trang của ban tổ chức:
 
-1. Xem thể lệ và mẫu thỏa thuận tại https://vlsp.org.vn/vlsp2021/eval/vieCap4H.
-2. Đăng ký tài khoản trên cổng thi của ban tổ chức (https://aihub.ml/competitions/40).
-3. Gửi thỏa thuận đã ký cho ban tổ chức theo địa chỉ ghi trên trang VLSP và chờ cấp quyền tải.
+1. Xem thể lệ và mẫu thỏa thuận tại trang VLSP 2021 của cuộc thi
+   (https://vlsp.org.vn/vlsp2021/eval/vieCap4H).
+2. Đăng ký tài khoản trên cổng thi mà trang đó chỉ dẫn.
+3. Gửi thỏa thuận đã ký cho ban tổ chức theo địa chỉ ghi trên trang đó và chờ cấp quyền tải.
 
 ## Thêm hoặc đổi dataset
 
