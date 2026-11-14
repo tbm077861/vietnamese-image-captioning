@@ -30,11 +30,19 @@ def get_device(name: str = "auto") -> torch.device:
     return torch.device(name)
 
 
+def close_logging() -> logging.Logger:
+    """Detach and close the project logger's handlers (releases the log file on Windows)."""
+    logger = logging.getLogger("vic")
+    for handler in list(logger.handlers):
+        logger.removeHandler(handler)
+        handler.close()
+    return logger
+
+
 def setup_logging(log_file: str | Path | None = None) -> logging.Logger:
     """Log to the console and optionally to a UTF-8 file."""
-    logger = logging.getLogger("vic")
+    logger = close_logging()
     logger.setLevel(logging.INFO)
-    logger.handlers.clear()
     logger.propagate = False
     formatter = logging.Formatter("%(asctime)s | %(message)s", datefmt="%H:%M:%S")
     if hasattr(sys.stdout, "reconfigure"):
