@@ -50,6 +50,13 @@ def _parse_overrides(overrides: list[str] | None) -> list[tuple[str, Any]]:
     return parsed
 
 
+def apply_overrides(config: dict, overrides: list[str] | None) -> dict:
+    """Apply ``key.subkey=value`` overrides to an already loaded config, in place."""
+    for key, value in _parse_overrides(overrides):
+        _set_by_path(config, key, value)
+    return config
+
+
 def load_config(path: str | Path, overrides: list[str] | None = None) -> dict:
     """Load an experiment config, merge its dataset config and apply ``key=value`` overrides."""
     config = copy.deepcopy(load_yaml(path))

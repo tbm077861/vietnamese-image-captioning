@@ -13,7 +13,13 @@ from vic.data.features import FeatureStore, create_feature_cache, write_feature_
 from vic.data.prepare import build_vocabulary, tokenize_records
 from vic.engine.checkpoint import load_checkpoint, model_from_checkpoint
 from vic.engine.data import load_experiment_data, make_image_loader
-from vic.engine.evaluation import build_references, generate_captions, score_captions
+from vic.engine.evaluation import (
+    build_references,
+    evaluate_checkpoint,
+    generate_captions,
+    score_captions,
+)
+from vic.engine.report import build_report
 from vic.engine.trainer import run_training
 from vic.text import CaptionTokenizer
 from vic.utils import read_json, write_json
@@ -138,6 +144,28 @@ def test_resume_reproduces_an_uninterrupted_run(toy_config):
     for name, tensor in weights_a.items():
         assert torch.allclose(tensor, weights_b[name], atol=1e-6), name
     assert read_json(outputs / "resumed" / "summary.json")["epochs_completed"] == 4
+
+
+def test_evaluate_checkpoint_and_report(toy_config):
+    config = copy.deepcopy(toy_config)
+    config["train"]["epochs"] = 8
+    run_training(config)
+    run_dir = data_paths(config).raw_dir.parents[2] / "outputs" / "tiny"
+    best = run_dir / "checkpoints" / "best.pt"
+    for split in ("val", "test"):
+        result = evaluate_checkpoint(best, split, beam_size=2)
+        saved = read_json(result["output"])
+        assert result["num_images"] == 6 and saved["scores"] == result["scores"]
+        assert len(saved["predictions"]) == 6 and saved["split"] == split
+    assert (run_dir / "eval_test_beam2.json").exists()
+
+    report = build_report(run_dir, samples=3, beam_size=2, worst=2, seed=1)
+    assert "## Đường cong học" in report and "tốt nhất" in report
+    assert "| val | beam 2 |" in report and "| test | beam 2 |" in report
+    assert report.count("**Ảnh `") == 3 + 2  # three random test images, two worst val images
+    assert report.count("- Sinh ra:") == 5 and "- Tham chiếu:" in report
+    # The same seed always selects the same examples.
+    assert report == build_report(run_dir, samples=3, beam_size=2, worst=2, seed=1)
 
 
 def test_fresh_run_never_overwrites_checkpoints_silently(toy_config):
