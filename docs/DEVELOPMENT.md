@@ -82,7 +82,22 @@ python scripts/verify_data.py --config configs/datasets/uit_openviic.yaml
 
 # Tiền xử lý: chuẩn hóa, tách từ, từ điển (thêm key=value ở cuối để ghi đè cấu hình)
 python scripts/prepare_data.py --config configs/baseline_lstm.yaml
+
+# Cache đặc trưng ảnh (một lần cho mỗi encoder / kích thước ảnh)
+python scripts/extract_features.py --config configs/baseline_lstm.yaml
+
+# Huấn luyện, tiếp tục khi bị ngắt, chạy thử nhanh
+python scripts/train.py --config configs/baseline_lstm.yaml
+python scripts/train.py --config configs/baseline_lstm.yaml --resume auto
+python scripts/train.py --config configs/baseline_lstm.yaml --max-steps 300 run_name=smoke
+
+# Đánh giá và suy luận
+python scripts/evaluate.py --checkpoint outputs/baseline_lstm/checkpoints/best.pt --split test
+python scripts/predict.py --checkpoint outputs/baseline_lstm/checkpoints/best.pt --image anh.jpg
+tensorboard --logdir outputs
 ```
+
+Trên Windows, khi in tiếng Việt ra console bị lỗi mã hóa thì thêm `-X utf8` sau `python`.
 
 ## Quy ước code
 
@@ -91,6 +106,13 @@ python scripts/prepare_data.py --config configs/baseline_lstm.yaml
 - Mọi tham số thí nghiệm nằm trong `configs/*.yaml`, không viết cứng trong code.
 - Đường dẫn dữ liệu và kết quả nằm dưới `data/` và `outputs/` (đều bị git bỏ qua).
 - Mỗi module có test tương ứng trong `tests/`.
+- Decoder mới hiện thực giao diện chung (`forward`, `init_state`, `step`, `reorder_state`) và
+  đăng ký vào `DECODERS`; dataset mới thêm YAML trong `configs/datasets/` và, nếu cần, một
+  adapter trong `src/vic/data/sources.py`.
+- Mỗi thí nghiệm có một file YAML riêng trong `configs/` và một `run_name` riêng; không sửa
+  file cấu hình của thí nghiệm đã chạy.
+- Các Pull Request của nhiều giai đoạn xếp chồng lên nhau: merge theo đúng thứ tự, dùng
+  "Create a merge commit" (không squash).
 
 ## Trạng thái hiện tại
 
@@ -99,7 +121,26 @@ python scripts/prepare_data.py --config configs/baseline_lstm.yaml
   annotation thống nhất (xem [DATASETS.md](DATASETS.md)).
 - **Đã xong:** Giai đoạn 3 – chuẩn hóa và tách từ tiếng Việt, từ điển, `Dataset` / collate /
   sampler tái lập được (`src/vic/text/`, `src/vic/data/`).
-- **Tiếp theo:** Giai đoạn 4 – mô hình baseline (xem [ROADMAP.md](ROADMAP.md)).
+- **Đã xong:** Giai đoạn 4 – baseline ResNet-50 + LSTM, cache đặc trưng, vòng huấn luyện có
+  resume, đánh giá, suy luận. Đã chạy thử 400 bước; **chưa huấn luyện đầy đủ**.
+- **Tiếp theo:** huấn luyện đầy đủ baseline, rồi Giai đoạn 5 – mô hình attention và Transformer.
+  Các bước cụ thể nằm trong [ROADMAP.md](ROADMAP.md); kiến trúc và lý do trong
+  [DESIGN.md](DESIGN.md).
+
+### Dữ liệu đã có sẵn trên máy phát triển
+
+Các thư mục sau đã được tạo (không nằm trong git), không cần chạy lại trừ khi đổi cấu hình:
+
+- `data/raw/uit_openviic/`: ảnh và annotation gốc;
+- `data/processed/uit_openviic/word_minfreq3/`: caption đã tách từ và từ điển;
+- `data/features/uit_openviic/resnet50_224/`: cache đặc trưng (2,45 GB);
+- `outputs/smoke_baseline/`: kết quả chạy thử, xóa được.
+
+### Việc còn dở
+
+- Chưa có kết quả huấn luyện đầy đủ nên chưa có bảng điểm chính thức.
+- Chưa có tùy chọn nạp trọng số để fine-tune encoder (xem Giai đoạn 6 trong lộ trình).
+- Chưa có CI; chạy `pytest` và `ruff check .` trước mỗi lần mở Pull Request.
 
 ## Quyết định đã chốt cho các giai đoạn tới
 
