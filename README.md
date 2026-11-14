@@ -3,8 +3,9 @@
 Hệ thống sinh câu mô tả tiếng Việt cho ảnh bằng deep learning: đầu vào là một ảnh, đầu ra là
 một câu mô tả tiếng Việt tự nhiên.
 
-> **Trạng thái:** đã có pipeline dữ liệu và mô hình baseline (ResNet-50 + LSTM) chạy được từ đầu
-> đến cuối; chưa huấn luyện đầy đủ. Xem [lộ trình](docs/ROADMAP.md) cho các bước tiếp theo.
+> **Trạng thái:** đã có pipeline dữ liệu và mô hình baseline (ResNet-50 + LSTM) huấn luyện đầy
+> đủ; kết quả ở [docs/RESULTS.md](docs/RESULTS.md). Các mô hình mạnh hơn nằm trong
+> [lộ trình](docs/ROADMAP.md).
 
 ## Cài đặt
 
@@ -34,12 +35,19 @@ Dự án dùng **UIT-OpenViIC**: 13.100 ảnh đời sống ở Việt Nam với
 
 - Nguồn: https://github.com/nghiangh/UIT-OpenViIC-dataset
 - Bài báo: Bui, Nguyen, Nguyen (2026), https://doi.org/10.1016/j.image.2025.117430
-- Giấy phép: bộ dữ liệu không có file giấy phép chính thức; tác giả tuyên bố bộ dữ liệu
-  *"publicly available for research purposes and freely accessible"* và bài báo ghi
-  *"non-commercial research"*. Dự án chỉ dùng cho nghiên cứu phi thương mại.
+- Giấy phép: bộ dữ liệu không có file giấy phép chính thức. Căn cứ sử dụng là tuyên bố của
+  tác giả trong README: *"publicly available for research purposes and freely accessible"*.
 
-Dữ liệu được tải về `data/` (khoảng 3,8 GB) và **không bao giờ được đưa lên repo**. Chi tiết
-khảo sát, số liệu kiểm tra và cách đổi sang dataset khác: [docs/DATASETS.md](docs/DATASETS.md).
+**Điều kiện sử dụng trong dự án này:**
+
+- Bộ dữ liệu **chỉ được dùng cho nghiên cứu phi thương mại**.
+- Repo này **không phân phối dữ liệu**: ảnh và caption do người dùng tự tải từ nguồn của tác
+  giả về thư mục `data/` (khoảng 3,8 GB), thư mục này không bao giờ được đưa lên repo.
+- Repo này **không phân phối checkpoint**: mô hình đã huấn luyện không được tải lên GitHub hay
+  bất kỳ nơi công khai nào. Muốn có mô hình, hãy tự huấn luyện bằng các lệnh bên dưới.
+
+Chi tiết khảo sát, số liệu kiểm tra và cách đổi sang dataset khác:
+[docs/DATASETS.md](docs/DATASETS.md).
 
 ## Chạy từ đầu đến cuối
 
@@ -93,7 +101,14 @@ python scripts/evaluate.py --checkpoint outputs/baseline_lstm/checkpoints/best.p
 ```
 
 In BLEU-1..4, CIDEr, METEOR và ghi điểm cùng toàn bộ caption sinh ra vào
-`outputs/baseline_lstm/eval_test_beam3.json`. Thêm `--beam-size 1` để giải mã greedy.
+`outputs/baseline_lstm/eval_test_beam3.json`. Thêm `--beam-size 1` để giải mã greedy. Có thể
+đánh giá nhiều tập và nhiều độ rộng beam trong một lệnh, rồi tổng hợp thành báo cáo Markdown
+(đường cong học, bảng điểm, ví dụ ngẫu nhiên theo seed cố định):
+
+```powershell
+python scripts/evaluate.py --checkpoint outputs/baseline_lstm/checkpoints/best.pt --split val test --beam-size 1 3 5
+python scripts/summarize_run.py --run outputs/baseline_lstm --output outputs/baseline_lstm/report.md
+```
 
 **BLEU và CIDEr là chỉ số chính.** METEOR ở đây chỉ khớp các từ giống hệt nhau vì tiếng Việt
 không có tài nguyên từ đồng nghĩa mà METEOR cần, nên chỉ để tham khảo. Điểm được tính trên âm
@@ -108,20 +123,20 @@ python scripts/predict.py --checkpoint outputs/baseline_lstm/checkpoints/best.pt
 Có thể truyền nhiều ảnh sau `--image`; thêm `--beam-size 5` để đổi độ rộng beam, `--device cpu`
 để chạy không cần GPU.
 
-## Kết quả chạy thử
+## Kết quả
 
-Chưa có kết quả huấn luyện đầy đủ. Số liệu dưới đây là từ một lần chạy thử 400 bước (hơn một
-epoch) trên RTX 5070 Laptop, chỉ để xác nhận pipeline hoạt động:
+Baseline ResNet-50 đóng băng + LSTM, huấn luyện 30 epoch (khoảng 8 phút trên RTX 5070 Laptop,
+VRAM đỉnh 385 MB), checkpoint tốt nhất ở epoch 28, giải mã beam 3:
 
-| | |
-|---|---|
-| Loss huấn luyện | 8,01 (50 bước đầu) giảm còn 3,46 (bước 351–400) |
-| Thời gian mỗi bước | khoảng 27 ms (batch 128, mixed precision, đặc trưng đã cache) |
-| VRAM đỉnh | 385 MB cấp phát, 524 MB PyTorch giữ |
-| Một epoch | 323 bước, khoảng 9 giây huấn luyện cộng 7 giây validate |
-| Sau 1 epoch, val (greedy) | BLEU-4 20,26; CIDEr 0,2248 |
+| Tập | BLEU-1 | BLEU-2 | BLEU-3 | BLEU-4 | CIDEr | METEOR (tham khảo) |
+|---|---:|---:|---:|---:|---:|---:|
+| val | 68,06 | 51,43 | 38,54 | 28,74 | 0,4274 | 22,10 |
+| test | 66,26 | 50,36 | 37,65 | 27,91 | 0,4479 | 21,76 |
 
-Ví dụ câu sinh ra sau một epoch: *"một cô gái mặc áo màu trắng đang đứng trước một quầy hàng"*.
+BLEU và METEOR nhân 100, CIDEr theo thang gốc 0–10, tính trên âm tiết. Baseline còn yếu: câu
+sinh ra thường chung chung, từ vựng nghèo và hay bịa ra người trong ảnh không có người. Bảng
+đầy đủ (greedy, beam 3, beam 5), đường cong học, 10 ví dụ trên tập test và phân tích lỗi:
+[docs/RESULTS.md](docs/RESULTS.md).
 
 ## Cấu trúc thư mục
 
@@ -138,6 +153,7 @@ tests/      test đơn vị
 
 ## Tài liệu
 
+- [Kết quả](docs/RESULTS.md): điểm số, đường cong học, ví dụ và phân tích lỗi của từng mô hình.
 - [Lộ trình dự án](docs/ROADMAP.md): các giai đoạn đã xong và việc còn lại.
 - [Thiết kế](docs/DESIGN.md): kiến trúc, lý do lựa chọn, phương án đã loại, rủi ro.
 - [Dữ liệu](docs/DATASETS.md): khảo sát, giấy phép, cách tải, cách đổi dataset.
@@ -146,5 +162,5 @@ tests/      test đơn vị
 ## Giấy phép
 
 Mã nguồn phát hành theo [giấy phép MIT](LICENSE). Giấy phép này **chỉ áp dụng cho mã nguồn**.
-Bộ dữ liệu tuân theo điều khoản riêng của tác giả bộ dữ liệu (xem mục Dữ liệu) và không nằm
-trong repo này.
+Bộ dữ liệu tuân theo điều khoản riêng của tác giả bộ dữ liệu, chỉ dùng cho nghiên cứu phi
+thương mại (xem mục Dữ liệu). Repo không chứa và không phân phối dữ liệu hay checkpoint.

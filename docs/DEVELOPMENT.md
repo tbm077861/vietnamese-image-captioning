@@ -29,7 +29,9 @@ Gradio, README hoàn chỉnh. Lộ trình chi tiết: [ROADMAP.md](ROADMAP.md).
    - Commit message chỉ gồm tiêu đề và nội dung, không thêm trailer hay chữ ký công cụ.
    - Xong giai đoạn thì mở Pull Request bằng `gh` và chờ chủ dự án duyệt merge.
    - Không force-push lên `main`, không xóa repo.
-4. Không bao giờ commit dữ liệu ảnh, checkpoint, `.venv` hay bí mật (token, key).
+4. Không bao giờ commit dữ liệu ảnh, checkpoint, `.venv` hay bí mật (token, key). Checkpoint
+   cũng không được tải lên bất kỳ nơi công khai nào (GitHub Releases, kho mô hình, ổ chia sẻ
+   công khai): dữ liệu huấn luyện chỉ cho phép nghiên cứu phi thương mại.
 5. Repo công khai chỉ chứa nội dung của dự án: không thông tin cá nhân, không email riêng.
 6. Dataset phải có giấy phép cho phép nghiên cứu; ghi nguồn và giấy phép trong README.
 7. Thí nghiệm phải tái lập được: seed cố định, cấu hình trong file YAML, có log kết quả.
@@ -92,7 +94,8 @@ python scripts/train.py --config configs/baseline_lstm.yaml --resume auto
 python scripts/train.py --config configs/baseline_lstm.yaml --max-steps 300 run_name=smoke
 
 # Đánh giá và suy luận
-python scripts/evaluate.py --checkpoint outputs/baseline_lstm/checkpoints/best.pt --split test
+python scripts/evaluate.py --checkpoint outputs/baseline_lstm/checkpoints/best.pt --split val --beam-size 1 3
+python scripts/summarize_run.py --run outputs/baseline_lstm --sample-split val
 python scripts/predict.py --checkpoint outputs/baseline_lstm/checkpoints/best.pt --image anh.jpg
 tensorboard --logdir outputs
 ```
@@ -122,10 +125,13 @@ Trên Windows, khi in tiếng Việt ra console bị lỗi mã hóa thì thêm `
 - **Đã xong:** Giai đoạn 3 – chuẩn hóa và tách từ tiếng Việt, từ điển, `Dataset` / collate /
   sampler tái lập được (`src/vic/text/`, `src/vic/data/`).
 - **Đã xong:** Giai đoạn 4 – baseline ResNet-50 + LSTM, cache đặc trưng, vòng huấn luyện có
-  resume, đánh giá, suy luận. Đã chạy thử 400 bước; **chưa huấn luyện đầy đủ**.
-- **Tiếp theo:** huấn luyện đầy đủ baseline, rồi Giai đoạn 5 – mô hình attention và Transformer.
-  Các bước cụ thể nằm trong [ROADMAP.md](ROADMAP.md); kiến trúc và lý do trong
-  [DESIGN.md](DESIGN.md).
+  resume, đánh giá, suy luận.
+- **Đã xong:** huấn luyện đầy đủ baseline và báo cáo kết quả (CIDEr val 0,4274 với beam 3), xem
+  [RESULTS.md](RESULTS.md).
+- **Tiếp theo:** Giai đoạn 5 – các mô hình mạnh hơn. Các bước cụ thể nằm trong
+  [ROADMAP.md](ROADMAP.md); kiến trúc và lý do trong [DESIGN.md](DESIGN.md).
+- **Quy tắc đánh giá:** chọn mô hình và tinh chỉnh chỉ dựa trên val; tập test chỉ dùng một lần
+  để báo cáo mô hình cuối cùng.
 
 ### Dữ liệu đã có sẵn trên máy phát triển
 
@@ -134,11 +140,12 @@ Các thư mục sau đã được tạo (không nằm trong git), không cần c
 - `data/raw/uit_openviic/`: ảnh và annotation gốc;
 - `data/processed/uit_openviic/word_minfreq3/`: caption đã tách từ và từ điển;
 - `data/features/uit_openviic/resnet50_224/`: cache đặc trưng (2,45 GB);
-- `outputs/smoke_baseline/`: kết quả chạy thử, xóa được.
+- `outputs/baseline_lstm/`: baseline chính thức (checkpoint, log, kết quả đánh giá, `report.md`).
+  Không xóa: đây là mốc so sánh.
 
 ### Việc còn dở
 
-- Chưa có kết quả huấn luyện đầy đủ nên chưa có bảng điểm chính thức.
+- Kết quả baseline mới có một seed, chưa đo độ dao động giữa các lần chạy.
 - Chưa có tùy chọn nạp trọng số để fine-tune encoder (xem Giai đoạn 6 trong lộ trình).
 - Chưa có CI; chạy `pytest` và `ruff check .` trước mỗi lần mở Pull Request.
 
