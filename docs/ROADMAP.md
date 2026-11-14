@@ -9,7 +9,7 @@ Trạng thái: ✅ xong · 🔄 đang làm · ⬜ chưa làm
 |---|-----------|-------|------------|
 | 1 | Khởi tạo dự án | `main` | ✅ |
 | 2 | Khảo sát và chọn dataset | `feat/dataset-survey` | ✅ |
-| 3 | Tiền xử lý tiếng Việt và pipeline dữ liệu | `feat/preprocessing` | ⬜ |
+| 3 | Tiền xử lý tiếng Việt và pipeline dữ liệu | `feat/preprocessing` | ✅ |
 | 4 | Mô hình baseline, huấn luyện, đánh giá, suy luận | `feat/baseline-model` | ⬜ |
 | 5 | Mô hình nâng cao (attention, Transformer) | `feat/advanced-model` | ⬜ |
 | 6 | Huấn luyện đầy đủ và tinh chỉnh | `feat/training` | ⬜ |
@@ -32,7 +32,7 @@ Trạng thái: ✅ xong · 🔄 đang làm · ⬜ chưa làm
 **Tiêu chí hoàn thành:** dữ liệu tải về `data/` và qua kiểm tra (số ảnh, số caption, ảnh hỏng,
 thống kê độ dài); README ghi nguồn và giấy phép; đổi dataset chỉ cần sửa YAML.
 
-## Giai đoạn 3 – Tiền xử lý tiếng Việt và pipeline dữ liệu
+## Giai đoạn 3 – Tiền xử lý tiếng Việt và pipeline dữ liệu ✅
 
 - Chuẩn hóa Unicode (NFC), chữ thường, dấu câu; tách từ tiếng Việt (tùy chọn mức âm tiết).
 - Từ điển có ngưỡng tần suất và token đặc biệt; chia train/val/test cố định theo seed.
