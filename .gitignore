@@ -12,12 +12,13 @@ dist/
 .venv/
 venv/
 
-# Data, cached features and model artifacts (never commit)
-data/
-checkpoints/
-outputs/
-runs/
-wandb/
+# Data, cached features and model artifacts (never commit).
+# Anchored to the repository root so that source packages such as src/vic/data are not ignored.
+/data/
+/checkpoints/
+/outputs/
+/runs/
+/wandb/
 *.pt
 *.pth
 *.ckpt

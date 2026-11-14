@@ -46,15 +46,39 @@ Ngôn ngữ: tài liệu và trao đổi bằng tiếng Việt; code, tên biế
   email dạng `<ID>+tbm077861@users.noreply.github.com`.
 - Trước khi push, kiểm tra tác giả của các commit mới: `git log --format="%an <%ae>"`.
 
-## Lệnh thường dùng
+## Cài đặt trên máy mới
+
+Chạy từ thư mục gốc của repo, đúng thứ tự:
 
 ```powershell
-.\.venv\Scripts\Activate.ps1          # kích hoạt môi trường
-pip install -r requirements.txt       # cài thư viện
-pip install -e . --no-deps            # cài gói vic ở chế độ phát triển
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install torch==2.14.1 torchvision==0.29.1 --index-url https://download.pytorch.org/whl/cu130
+pip install -r requirements.txt
+pip install -e . --no-deps
+python scripts/check_env.py
+```
+
+- Bước nâng cấp `pip` là bắt buộc: `pip` 23 đi kèm Python 3.10 báo lỗi khi cài từ kho PyTorch.
+- PyTorch cài riêng bằng `--index-url` để lấy bản CUDA 13.0. Trong `requirements.txt`, `torch`
+  và `torchvision` được ghim không kèm hậu tố `+cu130`, nên bước sau coi bản CUDA đã cài là
+  thỏa mãn: không lỗi, không ghi đè. Nếu bỏ qua bước cài PyTorch riêng, `pip` sẽ lấy bản CPU từ
+  PyPI và `check_env.py` sẽ báo `FAILED`.
+- Khi thêm thư viện: cài vào `.venv`, rồi ghi tên kèm phiên bản chính xác vào `requirements.txt`.
+
+## Lệnh thường dùng
+
+Mọi lệnh chạy từ thư mục gốc của repo, sau khi kích hoạt `.venv`.
+
+```powershell
 python scripts/check_env.py           # kiểm tra PyTorch / CUDA / GPU
 pytest                                # chạy test
 ruff check . ; ruff format .          # lint và định dạng code
+
+# Dữ liệu (xem docs/DATASETS.md)
+python scripts/download_data.py --config configs/datasets/uit_openviic.yaml
+python scripts/verify_data.py --config configs/datasets/uit_openviic.yaml
 ```
 
 ## Quy ước code
@@ -68,12 +92,15 @@ ruff check . ; ruff format .          # lint và định dạng code
 ## Trạng thái hiện tại
 
 - **Đã xong:** Giai đoạn 1 – khởi tạo dự án (repo, cấu trúc, môi trường, `check_env.py`).
-- **Tiếp theo:** Giai đoạn 2 – khảo sát và chọn dataset (xem [ROADMAP.md](ROADMAP.md)).
+- **Đã xong:** Giai đoạn 2 – chọn UIT-OpenViIC, script tải và kiểm tra dữ liệu, định dạng
+  annotation thống nhất (xem [DATASETS.md](DATASETS.md)).
+- **Tiếp theo:** Giai đoạn 3 – tiền xử lý tiếng Việt và pipeline dữ liệu (xem
+  [ROADMAP.md](ROADMAP.md)).
 
 ## Quyết định đã chốt cho các giai đoạn tới
 
-- Dataset: dùng bộ tốt nhất tải được tự do; bộ cần ký thỏa thuận thì ghi trong `docs/DATASETS.md`
-  kèm hướng dẫn xin. Đổi dataset chỉ cần sửa YAML.
+- Dataset: UIT-OpenViIC (tải tự do, tác giả cho phép dùng cho nghiên cứu). Đổi dataset chỉ cần
+  thêm một file YAML trong `configs/datasets/` và sửa dòng `dataset_config`.
 - Encoder đóng băng: trích xuất và cache đặc trưng ảnh (fp16) ra `data/`, huấn luyện đọc từ cache;
   vẫn giữ tùy chọn chạy encoder trực tiếp để fine-tune về sau.
 - Đánh giá: BLEU và CIDEr là chỉ số chính. METEOR chỉ để tham khảo vì không có tài nguyên từ đồng

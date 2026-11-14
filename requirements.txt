@@ -1,11 +1,17 @@
-# PyTorch built with CUDA 13.0 (RTX 50-series / Blackwell needs a CUDA 12.8+ build).
---extra-index-url https://download.pytorch.org/whl/cu130
-torch==2.14.1+cu130
-torchvision==0.29.1+cu130
+# Step 1 - install PyTorch built with CUDA 13.0 first (RTX 50-series needs a CUDA 12.8+ build):
+#   pip install torch==2.14.1 torchvision==0.29.1 --index-url https://download.pytorch.org/whl/cu130
+# Step 2 - install everything else:
+#   pip install -r requirements.txt
+#
+# The torch pins below carry no "+cu130" suffix on purpose: they are satisfied by the CUDA build
+# installed in step 1, so step 2 neither fails nor replaces it.
+torch==2.14.1
+torchvision==0.29.1
 
 numpy==2.2.6
 pillow==12.3.0
 PyYAML==6.0.3
+requests==2.34.2
 
 # Development
 pytest==9.2.0
