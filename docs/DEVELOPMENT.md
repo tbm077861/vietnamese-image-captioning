@@ -28,6 +28,10 @@ Gradio, README hoàn chỉnh. Lộ trình chi tiết: [ROADMAP.md](ROADMAP.md).
    - Commit theo Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`, `test:`, `refactor:`).
    - Commit message chỉ gồm tiêu đề và nội dung, không thêm trailer hay chữ ký công cụ.
    - Xong giai đoạn thì mở Pull Request bằng `gh` và chờ chủ dự án duyệt merge.
+   - Ngoại lệ đã được duyệt cho Bước 1–4 của Giai đoạn 5: mỗi bước một nhánh và một Pull
+     Request; khi `pytest` và `ruff` qua thì tự merge bằng merge commit, không cần chờ duyệt.
+   - Merge luôn bằng merge commit (`gh pr merge --merge`), sau khi kiểm tra base là `main`; xóa
+     nhánh đã merge.
    - Không force-push lên `main`, không xóa repo.
 4. Không bao giờ commit dữ liệu ảnh, checkpoint, `.venv` hay bí mật (token, key). Checkpoint
    cũng không được tải lên bất kỳ nơi công khai nào (GitHub Releases, kho mô hình, ổ chia sẻ
@@ -128,10 +132,27 @@ Trên Windows, khi in tiếng Việt ra console bị lỗi mã hóa thì thêm `
   resume, đánh giá, suy luận.
 - **Đã xong:** huấn luyện đầy đủ baseline và báo cáo kết quả (CIDEr val 0,4274 với beam 3), xem
   [RESULTS.md](RESULTS.md).
-- **Tiếp theo:** Giai đoạn 5 – các mô hình mạnh hơn. Các bước cụ thể nằm trong
-  [ROADMAP.md](ROADMAP.md); kiến trúc và lý do trong [DESIGN.md](DESIGN.md).
+- **Đã duyệt, chưa bắt đầu:** kế hoạch Giai đoạn 5–6 (bảy bước) trong
+  [ROADMAP.md](ROADMAP.md). Chưa có dòng code nào của Giai đoạn 5. `main` sạch, không có Pull
+  Request nào đang mở.
 - **Quy tắc đánh giá:** chọn mô hình và tinh chỉnh chỉ dựa trên val; tập test chỉ dùng một lần
   để báo cáo mô hình cuối cùng.
+
+## Việc kế tiếp
+
+Làm theo đúng thứ tự trong mục "Giai đoạn 5–6" của [ROADMAP.md](ROADMAP.md):
+
+1. **Bước 1 – Hạ tầng so sánh** (nhánh `feat/experiment-infra`): bảng thí nghiệm
+   `docs/EXPERIMENTS.md`, chỉ số canh độ tự nhiên, khóa tập test bằng cờ `--final`,
+   `train.py --init-from`, `scripts/run_sweep.py`, chạy baseline với seed 43 và 44 để đo độ nhiễu.
+2. **Bước 2 – LSTM có attention**, kèm kiểm tra beam search và length penalty trên val.
+3. **Bước 3 – Encoder mạnh hơn:** đúng hai ứng viên (một CLIP, một SigLIP), lưu lưới patch; xác
+   minh giấy phép trọng số tại nguồn trước khi tải, ghi vào `docs/MODELS.md`.
+4. **Bước 4 – Transformer decoder**, rồi chuẩn bị (không chạy) danh sách cấu hình cho Bước 5.
+5. **Dừng và báo cáo** theo bốn mục nêu trong ROADMAP. Bước 5–7 chờ chủ dự án duyệt.
+
+Sau mỗi bước: commit, mở Pull Request, cập nhật `docs/EXPERIMENTS.md`, `docs/ROADMAP.md` và hai
+mục "Trạng thái hiện tại", "Việc kế tiếp" của file này, rồi tự merge khi `pytest` và `ruff` qua.
 
 ### Dữ liệu đã có sẵn trên máy phát triển
 
@@ -145,9 +166,13 @@ Các thư mục sau đã được tạo (không nằm trong git), không cần c
 
 ### Việc còn dở
 
-- Kết quả baseline mới có một seed, chưa đo độ dao động giữa các lần chạy.
-- Chưa có tùy chọn nạp trọng số để fine-tune encoder (xem Giai đoạn 6 trong lộ trình).
-- Chưa có CI; chạy `pytest` và `ruff check .` trước mỗi lần mở Pull Request.
+- Kết quả baseline mới có một seed, chưa đo độ dao động giữa các lần chạy (Bước 1).
+- Chưa có `train.py --init-from`, chưa khóa tập test, chưa có bảng thí nghiệm (Bước 1).
+- Beam search: beam 5 kém greedy trên cả val và test dù đã có chuẩn hóa độ dài; chưa tìm
+  nguyên nhân (Bước 2).
+- Chưa có CI; chạy `pytest` và `ruff check .` trước mỗi lần mở Pull Request. Nên chạy test trên
+  một bản checkout sạch của nhánh (`git worktree`) vì thư mục làm việc có thể chứa file chưa
+  commit che mất lỗi thiếu file.
 
 ## Quyết định đã chốt cho các giai đoạn tới
 
@@ -157,3 +182,18 @@ Các thư mục sau đã được tạo (không nằm trong git), không cần c
   vẫn giữ tùy chọn chạy encoder trực tiếp để fine-tune về sau.
 - Đánh giá: BLEU và CIDEr là chỉ số chính. METEOR chỉ để tham khảo vì không có tài nguyên từ đồng
   nghĩa cho tiếng Việt (chỉ khớp chính xác theo từ).
+- Tập test: chỉ dùng một lần cho mô hình cuối cùng; mọi lựa chọn dựa trên val. Điểm test của
+  baseline trong `RESULTS.md` là mốc tham chiếu.
+- Tài liệu công khai chỉ trích tối đa một câu tham chiếu cho mỗi ảnh mẫu và phải ghi nguồn bộ dữ
+  liệu (`summarize_run.py` mặc định `--max-references 1`).
+- Trọng số pretrained: chỉ dùng trọng số có giấy phép cho phép nghiên cứu, ưu tiên MIT hoặc
+  Apache-2.0; xác minh tại nguồn trước khi tải và ghi vào `docs/MODELS.md`. Trọng số và cache đặc
+  trưng không được commit.
+- Encoder ứng viên: đúng hai, một CLIP và một SigLIP; không dùng DINOv2. Đặc trưng lưu dạng lưới
+  patch.
+- Fine-tune encoder: mặc định không làm; decoder tiếng Việt pretrained và fine-tune encoder (Bước
+  7) quyết định sau khi có kết quả Bước 1–6.
+- SCST: bản tối ưu CIDEr chỉ được chọn làm mô hình cuối nếu qua kiểm tra độ tự nhiên; nếu không,
+  mô hình cuối là bản huấn luyện bằng cross-entropy.
+- Checkpoint: không công bố ở bất kỳ đâu.
+- Lượt quét siêu tham số (Bước 5): tối đa 15 run, chủ dự án tự chạy bằng `scripts/run_sweep.py`.
