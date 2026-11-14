@@ -3,7 +3,7 @@ from PIL import Image
 
 from vic.data.annotations import make_record
 from vic.data.dataset import ImageStore
-from vic.data.image import load_image, preprocess_image
+from vic.data.image import load_image, preprocess_image, to_rgb
 
 
 def _half_red_image():
@@ -21,6 +21,15 @@ def test_preprocess_image_shape_and_exif_orientation():
     image.getexif()[0x0112] = 3  # EXIF orientation: stored rotated by 180 degrees
     flipped = preprocess_image(image, 32)
     assert flipped[1, 16, 2] > flipped[1, 16, 30]
+
+
+def test_transparent_areas_are_shown_on_white():
+    image = Image.new("RGBA", (8, 8), (0, 0, 0, 0))  # fully transparent black
+    image.paste((255, 0, 0, 255), (0, 0, 4, 8))  # opaque red on the left half
+    rgb = to_rgb(image)
+    assert rgb.mode == "RGB"
+    assert rgb.getpixel((1, 4)) == (255, 0, 0) and rgb.getpixel((6, 4)) == (255, 255, 255)
+    assert to_rgb(Image.new("L", (4, 4), 128)).getpixel((0, 0)) == (128, 128, 128)
 
 
 def test_non_rgb_and_truncated_files_load(tmp_path):

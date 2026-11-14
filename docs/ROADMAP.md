@@ -10,73 +10,128 @@ Trạng thái: ✅ xong · 🔄 đang làm · ⬜ chưa làm
 | 1 | Khởi tạo dự án | `main` | ✅ |
 | 2 | Khảo sát và chọn dataset | `feat/dataset-survey` | ✅ |
 | 3 | Tiền xử lý tiếng Việt và pipeline dữ liệu | `feat/preprocessing` | ✅ |
-| 4 | Mô hình baseline, huấn luyện, đánh giá, suy luận | `feat/baseline-model` | ⬜ |
+| 4 | Mô hình baseline, huấn luyện, đánh giá, suy luận | `feat/baseline-model` | ✅ |
 | 5 | Mô hình nâng cao (attention, Transformer) | `feat/advanced-model` | ⬜ |
 | 6 | Huấn luyện đầy đủ và tinh chỉnh | `feat/training` | ⬜ |
 | 7 | Đánh giá tổng hợp và phân tích lỗi | `feat/evaluation` | ⬜ |
 | 8 | Demo Gradio và hoàn thiện README | `feat/demo` | ⬜ |
 
+Việc đầu tiên cần làm tiếp: **huấn luyện đầy đủ baseline** (lệnh ở mục Giai đoạn 6, bước 1). Nó
+không phụ thuộc Giai đoạn 5 và cho ra mốc so sánh cho mọi mô hình sau.
+
 ## Giai đoạn 1 – Khởi tạo dự án ✅
 
-- Repo, cấu trúc thư mục, `.gitignore`, môi trường ảo, PyTorch bản CUDA, `scripts/check_env.py`.
-
-**Tiêu chí hoàn thành:** `python scripts/check_env.py` in đúng tên GPU và báo `GPU check: OK`;
-`pytest` chạy qua; `main` đã được đẩy lên GitHub.
+Repo, cấu trúc thư mục, `.gitignore`, môi trường ảo, PyTorch bản CUDA, `scripts/check_env.py`.
 
 ## Giai đoạn 2 – Khảo sát và chọn dataset ✅
 
-- Khảo sát các bộ image captioning tiếng Việt, xác minh giấy phép tại nguồn gốc.
-- Chọn UIT-OpenViIC (13.100 ảnh, 61.241 caption do người viết, tải tự do, dùng cho nghiên cứu).
-- `docs/DATASETS.md`, `scripts/download_data.py`, `scripts/verify_data.py`.
-
-**Tiêu chí hoàn thành:** dữ liệu tải về `data/` và qua kiểm tra (số ảnh, số caption, ảnh hỏng,
-thống kê độ dài); README ghi nguồn và giấy phép; đổi dataset chỉ cần sửa YAML.
+Chọn UIT-OpenViIC (13.100 ảnh, 61.241 caption do người viết). `docs/DATASETS.md`,
+`scripts/download_data.py`, `scripts/verify_data.py`, định dạng annotation thống nhất.
 
 ## Giai đoạn 3 – Tiền xử lý tiếng Việt và pipeline dữ liệu ✅
 
-- Chuẩn hóa Unicode (NFC), chữ thường, dấu câu; tách từ tiếng Việt (tùy chọn mức âm tiết).
-- Từ điển có ngưỡng tần suất và token đặc biệt; chia train/val/test cố định theo seed.
-- `Dataset` / `DataLoader` có padding; test đơn vị.
+Chuẩn hóa, tách từ, từ điển 3.482 token, `Dataset` / collate / sampler tái lập được,
+`scripts/prepare_data.py`.
 
-**Tiêu chí hoàn thành:** `pytest` qua; một batch mẫu có shape đúng và giải mã ngược ra đúng caption.
+## Giai đoạn 4 – Mô hình baseline ✅
 
-## Giai đoạn 4 – Mô hình baseline
+ResNet-50 đóng băng + LSTM, cache đặc trưng float16, vòng huấn luyện (mixed precision,
+checkpoint, resume chính xác, log), BLEU / CIDEr / METEOR, `train.py`, `evaluate.py`,
+`predict.py`. Đã chạy thử 400 bước: loss 8,01 giảm còn 3,46; sau 1 epoch CIDEr val 0,2248.
+**Chưa huấn luyện đầy đủ.**
 
-- Encoder ảnh pretrained (đóng băng) + decoder LSTM; giải mã greedy và beam search.
-- Trích xuất và cache đặc trưng ảnh (fp16) ra `data/`; vẫn giữ tùy chọn chạy encoder trực tiếp.
-- Vòng huấn luyện: mixed precision, checkpoint, resume, log, seed, cấu hình YAML.
-- `scripts/train.py`, `scripts/evaluate.py`, `scripts/predict.py`.
+---
 
-**Tiêu chí hoàn thành:** chạy thử vài trăm bước thấy loss giảm và GPU được dùng; resume từ
-checkpoint hoạt động; script đánh giá và suy luận chạy được trên checkpoint thử.
+## Giai đoạn 5 – Mô hình nâng cao ⬜
 
-## Giai đoạn 5 – Mô hình nâng cao
+Mục tiêu: hai decoder mạnh hơn baseline, dùng lại nguyên cache đặc trưng 49 vùng và toàn bộ
+vòng huấn luyện. Mỗi decoder là một lớp mới trong `src/vic/models/decoder.py`, hiện thực bốn
+hàm `forward`, `init_state`, `step`, `reorder_state` rồi đăng ký vào `DECODERS`. Không cần sửa
+`trainer.py`, `decoding.py` hay các script.
 
-- Decoder LSTM có attention trên lưới đặc trưng (kiểu Show, Attend and Tell).
-- Decoder Transformer trên đặc trưng lưới; cân nhắc encoder ViT.
-- So sánh với baseline trên cùng dữ liệu, cùng seed, cùng cách đánh giá.
+### 5a. LSTM có attention (kiểu Show, Attend and Tell)
 
-**Tiêu chí hoàn thành:** mỗi mô hình có file YAML riêng, huấn luyện được trong 8 GB VRAM và có
-bảng so sánh với baseline.
+1. Thêm lớp `AttentionLSTMDecoder`, đăng ký `DECODERS["lstm_attention"]`.
+   - `init_state(features)`: chiếu đặc trưng `(B, 49, 2048)` xuống `attention_dim`; khởi tạo
+     `h`, `c` từ trung bình các vùng. Trạng thái là bộ `(h, c, đặc_trưng_đã_chiếu)`.
+   - `step(tokens, state)`: trọng số `alpha = softmax(w · tanh(W_f f + W_h h))` trên 49 vùng;
+     ngữ cảnh là tổng có trọng số; đưa `[embedding; ngữ cảnh]` vào `nn.LSTMCell`; trả logits.
+   - `forward`: lặp `step` theo thời gian (tối đa 31 bước).
+   - `reorder_state`: chọn lại theo chiều batch cho cả ba phần tử của trạng thái.
+2. Tạo `configs/attention_lstm.yaml` từ `baseline_lstm.yaml`: đổi `run_name`,
+   `model.decoder.type: lstm_attention`, thêm `attention_dim: 512`.
+3. Test: sao chép các test hợp đồng trong `tests/test_model.py` (teacher forcing trùng với
+   chạy từng bước; beam 1 trùng greedy; `reorder_state`) cho decoder mới.
 
-## Giai đoạn 6 – Huấn luyện đầy đủ và tinh chỉnh
+### 5b. Decoder Transformer
 
-- Huấn luyện đầy đủ từng mô hình; early stopping theo CIDEr trên tập val.
-- Tinh chỉnh: learning rate, dropout, label smoothing, kích thước beam, fine-tune encoder.
+1. Thêm lớp `TransformerCaptionDecoder`, đăng ký `DECODERS["transformer"]`.
+   - Chiếu đặc trưng xuống `d_model` (512), cộng embedding vị trí học được cho 49 vùng.
+   - `nn.TransformerDecoder` 3 lớp, 8 đầu, feed-forward 2048, dropout 0,1; embedding vị trí cho
+     token; mặt nạ nhân quả và mặt nạ padding.
+   - Giải mã từng bước: trạng thái là `(memory, các_token_đã_sinh)`; mỗi `step` chạy lại decoder
+     trên tiền tố và lấy logits ở vị trí cuối (câu tối đa 30 token nên chi phí chấp nhận được).
+2. `configs/transformer.yaml`: `train.lr: 2.0e-4`, `warmup_steps: 1500`,
+   `label_smoothing: 0.1`, `batch_size: 64`.
+3. Cân nhắc chuyển sang mức âm tiết (`text.level=syllable`) cho Transformer và so sánh.
 
-**Tiêu chí hoàn thành:** mỗi thí nghiệm có cấu hình, log và checkpoint tốt nhất; kết quả tái lập
-được với cùng seed.
+### 5c. (Tùy chọn) Encoder khác
 
-## Giai đoạn 7 – Đánh giá tổng hợp và phân tích lỗi
+Thêm một mục vào `BACKBONES` trong `src/vic/models/encoder.py` (ví dụ ViT-B/16), chạy lại
+`extract_features.py`; cache mới nằm ở thư mục riêng theo tên encoder nên không ghi đè cache cũ.
 
-- Bảng BLEU-1..4, CIDEr (chính) và METEOR (tham khảo) trên tập test cho mọi mô hình.
-- Phân tích lỗi định tính: ví dụ đúng, sai, các kiểu lỗi thường gặp.
+**Tiêu chí hoàn thành:** mỗi mô hình có file YAML riêng, test hợp đồng qua, chạy thử vài trăm
+bước thấy loss giảm trong 8 GB VRAM.
 
-**Tiêu chí hoàn thành:** bảng kết quả và phần phân tích có trong README / `docs/`.
+## Giai đoạn 6 – Huấn luyện đầy đủ và tinh chỉnh ⬜
 
-## Giai đoạn 8 – Demo và hoàn thiện
+1. **Baseline đầy đủ** (khoảng 15 giây mỗi epoch, tối đa 30 epoch, có dừng sớm):
 
-- Demo Gradio: tải ảnh lên, nhận câu mô tả tiếng Việt.
-- README hoàn chỉnh: cài đặt, dữ liệu, huấn luyện, đánh giá, suy luận, demo, kết quả, giấy phép.
+   ```powershell
+   python scripts/train.py --config configs/baseline_lstm.yaml
+   python scripts/evaluate.py --checkpoint outputs/baseline_lstm/checkpoints/best.pt --split test
+   ```
+
+2. Huấn luyện đầy đủ các mô hình của Giai đoạn 5 với cùng seed.
+3. Tinh chỉnh, mỗi lần đổi một yếu tố và đặt `run_name` riêng:
+   - `train.lr`: 5e-4, 1e-3, 2e-3; `model.decoder.dropout`: 0,3 và 0,5;
+   - `train.label_smoothing`: 0 và 0,1; `text.min_freq`: 3 và 5 (phải chạy lại `prepare_data.py`);
+   - `text.level`: word và syllable;
+   - khi đánh giá: `--beam-size` 1, 3, 5 và `eval.length_penalty` 0 / 0,7 / 1,0.
+4. Fine-tune encoder (sau khi decoder đã hội tụ):
+   - cần thêm tùy chọn nạp trọng số từ checkpoint mà không nạp optimizer (ví dụ `--init-from`);
+     hiện `--resume` khôi phục cả optimizer và tiến độ nên không dùng cho việc này được;
+   - chạy với `data.use_cached_features=false model.encoder.trainable=true
+     train.batch_size=32 train.num_workers=4 train.encoder_lr=1e-5`;
+   - chỉ mở khóa khối cuối của ResNet nếu thiếu VRAM;
+   - **không lật ngang ảnh** khi tăng cường dữ liệu: caption của bộ này dùng nhiều "bên trái",
+     "bên phải".
+5. Ghi mọi thí nghiệm vào `docs/EXPERIMENTS.md`: cấu hình, seed, điểm val, điểm test, thời gian.
+
+**Tiêu chí hoàn thành:** mỗi thí nghiệm có cấu hình, log và `best.pt`; chạy lại cùng seed cho
+kết quả tương đương; có bảng so sánh các mô hình trên val.
+
+## Giai đoạn 7 – Đánh giá tổng hợp và phân tích lỗi ⬜
+
+1. Chạy `evaluate.py --split test` cho checkpoint tốt nhất của từng mô hình (beam 3), đưa bảng
+   BLEU-1..4, CIDEr (chính) và METEOR (tham khảo) vào README.
+2. Phân tích lỗi trong `notebooks/error_analysis.ipynb`:
+   - `cider_d` trả về điểm từng ảnh: xem 20 ảnh điểm cao nhất và 20 ảnh thấp nhất;
+   - phân loại lỗi: đếm sai số lượng, sai màu, sai trái / phải, bịa vật thể, câu lặp, câu cụt;
+   - so độ dài câu sinh ra với câu tham chiếu; đếm số từ khác nhau mô hình thực sự dùng.
+3. (Tùy chọn) đối chiếu một checkpoint với `pycocoevalcap`; dùng phần tiếng Việt của XM3600 làm
+   tập kiểm tra ngoài miền.
+
+**Tiêu chí hoàn thành:** bảng kết quả test và phần phân tích lỗi có trong README hoặc `docs/`.
+
+## Giai đoạn 8 – Demo và hoàn thiện ⬜
+
+1. `scripts/demo.py` dùng Gradio: tải ảnh lên, chọn độ rộng beam, nhận câu mô tả. Lớp
+   `CaptionPredictor` (`src/vic/engine/inference.py`) đã lo việc nạp checkpoint và sinh câu.
+2. Ghim `gradio` trong `requirements.txt`; thêm lệnh chạy demo vào README.
+3. README hoàn chỉnh: bảng kết quả, vài ví dụ đúng và sai (ảnh nhỏ đặt trong `docs/assets/`),
+   hạn chế đã biết, trích dẫn bộ dữ liệu.
+4. Quyết định của chủ dự án: có công bố checkpoint không. Mô hình học từ dữ liệu chỉ cho phép
+   nghiên cứu phi thương mại nên nếu công bố phải ghi rõ điều kiện đó.
 
 **Tiêu chí hoàn thành:** người mới làm theo README chạy được suy luận và demo từ checkpoint.

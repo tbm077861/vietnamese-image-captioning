@@ -16,16 +16,29 @@ IMAGENET_STD = (0.229, 0.224, 0.225)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
+def to_rgb(image: Image.Image) -> Image.Image:
+    """Return an upright RGB image.
+
+    The EXIF orientation is applied (phone photos end up upright) and transparent areas are
+    shown on white, as an image viewer would, instead of exposing the hidden colour under them.
+    """
+    image = ImageOps.exif_transpose(image)
+    has_alpha = image.mode in ("RGBA", "LA") or (image.mode == "P" and "transparency" in image.info)
+    if has_alpha:
+        image = image.convert("RGBA")
+        background = Image.new("RGBA", image.size, (255, 255, 255, 255))
+        return Image.alpha_composite(background, image).convert("RGB")
+    return image.convert("RGB")
+
+
 def load_image(path: str | Path) -> Image.Image:
-    """Open an image as RGB with its EXIF orientation applied (phone photos end up upright)."""
     with Image.open(path) as image:
-        return ImageOps.exif_transpose(image).convert("RGB")
+        return to_rgb(image)
 
 
 def preprocess_image(image: Image.Image, image_size: int = 224) -> torch.Tensor:
     """Resize the whole image to a square (no cropping) and normalise it: (3, size, size)."""
-    image = ImageOps.exif_transpose(image).convert("RGB")
-    image = image.resize((image_size, image_size), Image.Resampling.BICUBIC)
+    image = to_rgb(image).resize((image_size, image_size), Image.Resampling.BICUBIC)
     tensor = torch.from_numpy(np.asarray(image, dtype=np.float32) / 255.0).permute(2, 0, 1)
     mean = torch.tensor(IMAGENET_MEAN).view(3, 1, 1)
     std = torch.tensor(IMAGENET_STD).view(3, 1, 1)

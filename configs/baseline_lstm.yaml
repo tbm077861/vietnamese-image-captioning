@@ -1,6 +1,6 @@
 # Baseline experiment: frozen ResNet-50 features + LSTM decoder.
 # Run every script from the repository root. Any value can be overridden on the command line,
-# for example:  python scripts/prepare_data.py --config configs/baseline_lstm.yaml text.level=syllable
+# for example:  python scripts/train.py --config configs/baseline_lstm.yaml train.batch_size=64
 
 seed: 42
 run_name: baseline_lstm
@@ -17,4 +17,45 @@ text:
   strip_punctuation: true
   min_freq: 3                # tokens seen fewer times in train become <unk>
   max_vocab_size: null
-  max_length: 30             # captions are truncated to this many tokens
+  max_length: 30             # captions are truncated to this many tokens; also the decoding limit
+
+data:
+  use_cached_features: true  # false: run the encoder on images (required to fine-tune it)
+  features_in_memory: true   # load the cache into RAM (about 2.5 GB); false: memory-map it
+
+model:
+  encoder:
+    name: resnet50           # resnet50 or resnet101, ImageNet weights
+    image_size: 224          # 224 px -> 7 x 7 grid of 2048-d features
+    trainable: false         # true needs data.use_cached_features=false
+  decoder:
+    type: lstm
+    embed_dim: 512
+    hidden_dim: 512
+    num_layers: 1
+    dropout: 0.5
+
+train:
+  epochs: 30
+  batch_size: 128
+  lr: 1.0e-3
+  encoder_lr: 1.0e-5         # only used when the encoder is trainable
+  weight_decay: 0.0
+  grad_clip: 5.0
+  label_smoothing: 0.0
+  scheduler: cosine          # cosine or none
+  warmup_steps: 300
+  amp: true                  # mixed precision (float16 autocast) on GPU
+  num_workers: 0             # cached features need no workers; use 4+ when training on images
+  log_every: 50
+  save_every_steps: 200      # also saved at the end of every epoch
+  eval_every_epochs: 1
+  monitor: CIDEr             # metric that selects best.pt
+  early_stopping_patience: 5 # evaluations without improvement; 0 disables
+  tensorboard: true
+  deterministic: false
+
+eval:
+  beam_size: 3               # used by evaluate.py and predict.py; training validates greedily
+  length_penalty: 0.7
+  batch_size: 128
