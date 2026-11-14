@@ -119,97 +119,63 @@ Ba con số đáng chú ý nhất:
 ### 10 ảnh test chọn ngẫu nhiên (seed 42, beam 3)
 
 Chọn bằng `random.Random(42).sample(...)` trên danh sách mã ảnh test đã sắp xếp. Điểm CIDEr là
-của riêng ảnh đó. Ảnh không nằm trong repo; mã ảnh là tên file trong bộ dữ liệu.
+của riêng ảnh đó và được tính trên toàn bộ câu tham chiếu của ảnh. Ảnh không nằm trong repo; mã
+ảnh là tên file trong bộ dữ liệu.
+
+Mỗi ảnh chỉ trích **một** câu tham chiếu (câu đầu tiên trong các câu của ảnh) để minh họa. Câu
+tham chiếu thuộc bộ dữ liệu **UIT-OpenViIC** (Bui, Nguyen, Nguyen, 2026;
+https://github.com/nghiangh/UIT-OpenViIC-dataset), được trích ở đây cho mục đích nghiên cứu phi
+thương mại. Repo này không phân phối bộ dữ liệu.
 
 **Ảnh `00000009308`** (CIDEr 0.74)
 
 - Sinh ra: *một người đàn ông mặc áo màu xanh đang đứng trước một tấm bảng màu đỏ*
 - Tham chiếu: một người đàn ông mặc áo cam đội mũ đen đang đứng trước những rào chắn màu đỏ có dán những tờ giấy màu trắng chữ đen
-- Tham chiếu: người đàn ông mặc áo màu cam đang đứng cạnh những chiếc hàng rào màu đỏ
-- Tham chiếu: người đàn ông mang áo màu cam và quần màu đen đang đứng cạnh cái rào màu đỏ và màu trắng
-- Tham chiếu: người đàn ông mặc áo màu cam đứng cạnh hàng rào đỏ trắng đối diện người đàn ông mặc áo đen đeo khẩu trang xanh
-- Tham chiếu: một người đàn ông mặc áo cam đang giao hàng qua một rào chắn và có một thanh niên đang đi đến
 
 **Ảnh `00000001046`** (CIDEr 0.16)
 
 - Sinh ra: *một tòa nhà màu vàng có nhiều hơn một tầng có nhiều cửa sổ và ở trước có một chiếc xe máy đang đậu*
 - Tham chiếu: phía sau căn nhà màu vàng là một căn nhà cao tầng có cửa kính
-- Tham chiếu: một cái cây nằm ở giữa hai tòa nhà màu vàng có hành lang bắc ngang qua
-- Tham chiếu: phía trước tòa nhà màu vàng là cái cây có lá màu xanh
-- Tham chiếu: một nguời đàn ông đứng cạnh lan can lầu 2 của tòa nhà màu vàng
-- Tham chiếu: một ngôi trường sơn màu vàng có cây xanh ở góc phải
 
 **Ảnh `00000000151`** (CIDEr 0.18)
 
 - Sinh ra: *một người đàn ông mặc áo trắng đang đi trên đường*
 - Tham chiếu: ba người chạy xe đạp giữa con đường đầy lá vàng và hai bên là hàng cây trải dài
-- Tham chiếu: ba người đang đạp xe đạp trên con đường đầy lá vàng với hai bên là hai hàng cây cao
-- Tham chiếu: ba người đang đi xe đạp trên con đường đất nằm giữa hai hàng cây
-- Tham chiếu: trên con đường trải lá vàng với hai bên là hai hàng cây xanh có ba người đang đạp xe
-- Tham chiếu: có ba người đang đạp xe trên một con đường hai bên có hai hàng cây cổ thụ
 
 **Ảnh `00000009817`** (CIDEr 0.29)
 
 - Sinh ra: *một con đường có nhiều tòa nhà cao tầng và có nhiều cây xanh*
 - Tham chiếu: có vài người đang di chuyển trên con đường mà bên phải là nhiều ngôi nhà có treo đèn ở ban công nằm san sát nhau
-- Tham chiếu: một chiếc ô tô đang ở trước căn nhà sáng nhất trong dãy nhà bên phải
-- Tham chiếu: người đàn ông mang áo màu trắng quần đen đang đi cạnh cô gái mang váy màu trắng hướng về phía bên trái của bức hình
-- Tham chiếu: có 1 chiếc xe hơi đi trên đường qua khu nhà màu trắng có bồn cây trước cửa
-- Tham chiếu: có vài người đang đi bộ trên một con đường có dãy nhà hai bên
 
 **Ảnh `00000005151`** (CIDEr 0.76)
 
 - Sinh ra: *một người phụ nữ mặc áo đỏ đang cầm một hộp sữa trên tay*
 - Tham chiếu: một cô gái mặc áo đỏ đứng trước một gian hàng có đèn vàng
-- Tham chiếu: người phụ nữ mặc áo đỏ cầm điện thoại bên tay phải và tay trái cầm một lốc màu đỏ
-- Tham chiếu: có một cô gái buộc tóc đang cầm một lốc sữa
-- Tham chiếu: nhân viên cửa hàng mặc áo màu đỏ đứng trước khu chứa sữa đang cầm điện thoại trên tay
-- Tham chiếu: một nhân viên mặc áo đỏ tay trái cầm điện thoại tay phải đang cầm một lốc sữa bên cạnh một kệ hàng
 
 **Ảnh `00000005089`** (CIDEr 0.44)
 
 - Sinh ra: *một cửa hàng có biển hiệu màu đen và dòng chữ màu vàng*
 - Tham chiếu: một cửa hàng bảng hiệu đen nền vàng đang đóng một cửa mở một cửa
-- Tham chiếu: mệt hình tròn ở trên nền màu đen và có hàng chữ vàng ở dưới
-- Tham chiếu: có một người đàn ông mang áo màu đen đang đứng dưới một cái ô lớn
-- Tham chiếu: có 1 người đàn ông đang đứng dưới chiếc dù màu vàng trước cửa hàng treo tấm biển màu đen chữ vàng
-- Tham chiếu: một cửa hàng điện thoại di động được sơn màu vàng và góc bên phải có cây xanh
 
 **Ảnh `00000005045`** (CIDEr 0.10)
 
 - Sinh ra: *một tấm bảng hiệu nền màu đỏ với nhiều dòng chữ màu vàng*
 - Tham chiếu: nhiều người đang đứng thành hàng xem múa lân
-- Tham chiếu: hai chú lân màu vàng đang đứng trước tấm bảng màu cam
-- Tham chiếu: trước mặt cửa hàng có hai con lân màu cam đang nhảy
-- Tham chiếu: rất nhiều người đứng trước cửa hàng xem múa lân
-- Tham chiếu: nhiều người đang đứng xe hai con lân nhảy trước một cửa hàng khai trương
 
 **Ảnh `00000001103`** (CIDEr 0.96)
 
 - Sinh ra: *một người đàn ông mặc áo màu xanh đang đứng trước một cửa hàng*
 - Tham chiếu: một người đàn ông ngồi trên chiếc xe đỏ đậu trước một cửa hàng dùng cửa cuốn
-- Tham chiếu: một người đang ngồi trên xe máy ở phía trước một cánh cửa màu vàng
-- Tham chiếu: một người mang áo màu xanh đang ngồi trên một chiếc xe máy màu đỏ
-- Tham chiếu: có 1 chiếc xe máy đậu phía trước căn nhà sử dụng cửa sắt màu vàng
-- Tham chiếu: một người đàn ông dựng chiếc xe máy trước một cửa hàng đã đóng cửa
 
 **Ảnh `00000009807`** (CIDEr 0.46)
 
 - Sinh ra: *một bức tranh vẽ một con phố với nhiều ngôi nhà được sơn màu vàng*
 - Tham chiếu: có một cái máy lạnh màu trắng nằm phía trên bên trái của một bức tranh được lồng khung treo cạnh bộ công tắc màu trắng
-- Tham chiếu: một chiếc máy lạnh màu trắng đặt trên nền tường màu trắng và ở phía trên một bức tranh phong cảnh
-- Tham chiếu: ở phía trên bức tranh có khung màu vàng có một cái điều hòa màu trắng
-- Tham chiếu: bức tranh phong cảnh đã đóng khung được treo trên bức tường màu trắng phía dưới chiếc điều hòa
-- Tham chiếu: một bức tranh hình chữ nhật treo trên tường bên góc phải dưới một máy lạnh
 
 **Ảnh `00000001027`** (CIDEr 0.24)
 
 - Sinh ra: *nhiều người đang đứng trước một quầy hàng bán đồ trang trí giáng sinh*
 - Tham chiếu: nhiều người mặc áo trắng có mang cà vạt đang đứng trước một kệ nhiều sách
-- Tham chiếu: cây xanh cao ở phía sau những người đàn ông mặc áo trắng
-- Tham chiếu: có nhiều người đàn ông và một người phụ nữ đang đứng trước một kệ sách
-- Tham chiếu: phía trước cái cây có rất nhiều người đang đứng tham quan khu trưng bày truyện tranh
-- Tham chiếu: có nhiều người đang đứng xem một kệ sách có nhiều sách doremon
 
 ### Các kiểu lỗi thường gặp
 
