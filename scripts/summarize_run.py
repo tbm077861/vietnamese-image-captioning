@@ -25,6 +25,12 @@ def main() -> None:
     parser.add_argument("--beam-size", type=int, default=3, help="decoding shown in examples")
     parser.add_argument("--worst", type=int, default=0, help="also list the N lowest-CIDEr images")
     parser.add_argument("--seed", type=int, default=42, help="seed of the random examples")
+    parser.add_argument(
+        "--max-references",
+        type=int,
+        default=1,
+        help="reference captions quoted per example (dataset text: keep it small when publishing)",
+    )
     args = parser.parse_args()
 
     report = build_report(
@@ -35,6 +41,7 @@ def main() -> None:
         beam_size=args.beam_size,
         worst=args.worst,
         seed=args.seed,
+        max_references=args.max_references,
     )
     if args.output:
         Path(args.output).write_text(report, encoding="utf-8")

@@ -163,7 +163,10 @@ def test_evaluate_checkpoint_and_report(toy_config):
     assert "## Đường cong học" in report and "tốt nhất" in report
     assert "| val | beam 2 |" in report and "| test | beam 2 |" in report
     assert report.count("**Ảnh `") == 3 + 2  # three random test images, two worst val images
-    assert report.count("- Sinh ra:") == 5 and "- Tham chiếu:" in report
+    # By default one reference caption is quoted per example; scores still use all of them.
+    assert report.count("- Sinh ra:") == 5 and report.count("- Tham chiếu:") == 5
+    both = build_report(run_dir, samples=3, beam_size=2, worst=2, seed=1, max_references=2)
+    assert both.count("- Tham chiếu:") == 10
     # The same seed always selects the same examples.
     assert report == build_report(run_dir, samples=3, beam_size=2, worst=2, seed=1)
 

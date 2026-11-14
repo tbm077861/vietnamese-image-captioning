@@ -105,13 +105,19 @@ def per_image_cider(evaluation: dict, references: dict[str, list[str]]) -> dict[
     return dict(zip(image_ids, scores, strict=True))
 
 
-def example_block(image_id: str, evaluation: dict, raw: dict, cider: float) -> list[str]:
+def example_block(
+    image_id: str, evaluation: dict, raw: dict, cider: float, max_references: int = 1
+) -> list[str]:
+    """One example: the generated caption and the first ``max_references`` reference captions.
+
+    Reference captions are dataset text, so published reports quote as few as needed.
+    """
     lines = [
         f"**Ảnh `{image_id}`** (CIDEr {cider:.2f})",
         "",
         f"- Sinh ra: *{evaluation['predictions'][image_id]}*",
     ]
-    lines += [f"- Tham chiếu: {caption}" for caption in raw[image_id]]
+    lines += [f"- Tham chiếu: {caption}" for caption in raw[image_id][:max_references]]
     return [*lines, ""]
 
 
@@ -123,12 +129,14 @@ def build_report(
     beam_size: int = 3,
     worst: int = 0,
     seed: int = 42,
+    max_references: int = 1,
 ) -> str:
     """Return the Markdown report of a run.
 
-    ``samples`` random images of ``sample_split`` are shown with their generated and reference
-    captions; diagnostics (and optionally the ``worst`` lowest-CIDEr images) use
-    ``analysis_split``. Both use the evaluation decoded with ``beam_size``.
+    ``samples`` random images of ``sample_split`` are shown with their generated caption and
+    their first ``max_references`` reference captions; diagnostics (and optionally the
+    ``worst`` lowest-CIDEr images) use ``analysis_split``. Both use the evaluation decoded
+    with ``beam_size``. Scores always use every reference caption.
     """
     run_dir = Path(run_dir)
     config = load_yaml(run_dir / "config.yaml")
@@ -150,7 +158,7 @@ def build_report(
             scores = per_image_cider(analysis, references)
             lines += ["", f"### {worst} ảnh {analysis_split} có CIDEr thấp nhất", ""]
             for image_id in sorted(scores, key=scores.get)[:worst]:
-                lines += example_block(image_id, analysis, raw, scores[image_id])
+                lines += example_block(image_id, analysis, raw, scores[image_id], max_references)
 
     sampled = by_key.get((sample_split, beam_size))
     if sampled is not None and samples > 0:
@@ -162,6 +170,6 @@ def build_report(
             "",
         ]
         for image_id in chosen:
-            lines += example_block(image_id, sampled, raw, scores[image_id])
+            lines += example_block(image_id, sampled, raw, scores[image_id], max_references)
 
     return "\n".join(lines) + "\n"
