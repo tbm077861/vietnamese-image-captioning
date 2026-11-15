@@ -161,6 +161,16 @@ ngữ cảnh; `[embedding; ngữ cảnh]` đi vào `nn.LSTMCell`. Trạng thái 
 khóa_attention)` nên `reorder_state` chỉ cần chọn lại theo chiều batch. Khoảng 8,8 triệu tham
 số. Kết quả so với baseline: [EXPERIMENTS.md](EXPERIMENTS.md).
 
+### Decoder Transformer (`transformer`)
+
+Lưới vùng được chiếu xuống `d_model` (512), cộng một embedding vị trí học được cho mỗi vùng, rồi
+làm `memory` cho `nn.TransformerDecoder` (3 lớp pre-norm, 8 đầu, feed-forward 2048). Token có
+embedding vị trí học được; ma trận embedding dùng chung với lớp ra. Mặt nạ nhân quả chặn nhìn
+trước, mặt nạ padding bỏ các vị trí `<pad>`. Khi giải mã từng bước, trạng thái là `(memory,
+tiền_tố)`: mỗi `step` nối token mới vào tiền tố và chạy lại decoder trên cả tiền tố, lấy logits ở
+vị trí cuối. Câu tối đa khoảng 30 token nên cách này đủ nhanh và không cần cache kích hoạt của từng
+lớp. Khoảng 15 triệu tham số; overfit sớm với dropout 0,1 (xem [EXPERIMENTS.md](EXPERIMENTS.md)).
+
 ## 8. Giải mã
 
 - Greedy theo batch (dùng khi validate) và beam search từng ảnh (mặc định beam 3).
