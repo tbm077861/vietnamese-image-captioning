@@ -25,6 +25,8 @@ class CaptionPredictor:
         eval_config = self.config.get("eval", {})
         self.default_beam_size = int(eval_config.get("beam_size", 3))
         self.length_penalty = float(eval_config.get("length_penalty", 0.7))
+        self.no_repeat_ngram_size = int(eval_config.get("no_repeat_ngram_size", 0))
+        self.beam_stop = str(eval_config.get("beam_stop", "first"))
         self.max_length = int(self.config["text"].get("max_length", 30))
 
     @torch.no_grad()
@@ -42,11 +44,12 @@ class CaptionPredictor:
             if beam_size <= 1:
                 token_ids = greedy_decode(
                     self.model.decoder, features, vocab.bos_id, vocab.eos_id, self.max_length,
-                    suppress_ids,
+                    suppress_ids, self.no_repeat_ngram_size,
                 )[0]  # fmt: skip
             else:
                 token_ids = beam_search(
                     self.model.decoder, features, vocab.bos_id, vocab.eos_id, beam_size,
                     self.max_length, self.length_penalty, suppress_ids,
+                    self.no_repeat_ngram_size, self.beam_stop,
                 )  # fmt: skip
         return detokenize(vocab.decode(token_ids))

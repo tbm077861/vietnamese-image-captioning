@@ -293,3 +293,20 @@ def test_experiments_doc_is_created_and_comparison_uses_fixed_images(toy_config,
     assert comparison == build_comparison(
         [outputs / "tiny", outputs / "other"], beam_size=2, samples=4
     )
+
+
+def test_attention_decoder_trains_end_to_end(toy_config):
+    config = copy.deepcopy(toy_config)
+    config["train"]["epochs"] = 30
+    config["model"]["decoder"] = {
+        "type": "lstm_attention",
+        "embed_dim": 32,
+        "hidden_dim": 48,
+        "attention_dim": 40,
+        "dropout": 0.0,
+    }
+    summary = run_training(config)
+    assert summary["last_loss"] < 0.5 * summary["first_loss"] and summary["best_score"] > 0
+    best = _outputs(config) / "tiny" / "checkpoints" / "best.pt"
+    result = evaluate_checkpoint(best, "val", beam_size=2, overrides=["eval.beam_stop=best"])
+    assert result["decoding"]["beam_stop"] == "best" and result["scores"]["BLEU-1"] > 0.5

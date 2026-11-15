@@ -11,13 +11,13 @@ Trạng thái: ✅ xong · 🔄 đang làm · ⬜ chưa làm
 | 2 | Khảo sát và chọn dataset | ✅ |
 | 3 | Tiền xử lý tiếng Việt và pipeline dữ liệu | ✅ |
 | 4 | Mô hình baseline, huấn luyện, đánh giá, suy luận, kết quả baseline | ✅ |
-| 5 | Mô hình mạnh hơn: bước 1–4 của kế hoạch bên dưới | 🔄 bước 1 xong, kế tiếp là bước 2 |
+| 5 | Mô hình mạnh hơn: bước 1–4 của kế hoạch bên dưới | 🔄 bước 1–2 xong, kế tiếp là bước 3 |
 | 6 | Tinh chỉnh, tối ưu CIDEr, hướng tùy chọn: bước 5–7 | ⬜ |
 | 7 | Đánh giá tổng hợp và phân tích lỗi | ⬜ |
 | 8 | Demo Gradio và hoàn thiện README | ⬜ |
 
-**Việc kế tiếp: Bước 2 của Giai đoạn 5** (LSTM có attention và kiểm tra beam search). Bảng so
-sánh mọi run: [EXPERIMENTS.md](EXPERIMENTS.md).
+**Việc kế tiếp: Bước 3 của Giai đoạn 5** (encoder CLIP và SigLIP). Bảng so sánh mọi run:
+[EXPERIMENTS.md](EXPERIMENTS.md).
 
 **Quy tắc đánh giá:** mọi lựa chọn mô hình, siêu tham số và cách giải mã chỉ dựa trên tập val.
 Tập test chỉ được dùng thêm một lần, để báo cáo mô hình cuối cùng.
@@ -103,7 +103,14 @@ mới được coi là thật. Dừng sớm với ngưỡng 5 epoch góp phần 
 8. Bộ 50 ảnh val cố định theo seed để đọc bằng mắt
    (`summarize_run.py --sample-split val --samples 50`).
 
-### Bước 2 – LSTM có attention ⬜ (nhánh `feat/attention-decoder`)
+### Bước 2 – LSTM có attention ✅ (nhánh `feat/attention-decoder`)
+
+**Kết quả:** CIDEr val 0,4860 ± 0,0024 so với 0,4199 ± 0,0164 của baseline (beam 3, ba seed):
+cải thiện thật (vượt ngưỡng 0,033). Câu đa dạng hơn rõ (1.496–1.600 câu khác nhau so với
+918–1.036). Beam rộng kém vì mô hình ưa câu chung chung hoặc vòng lặp khi được tìm kỹ hơn, không
+phải lỗi điều kiện dừng. Cách giải mã chốt cho mô hình cuối: beam 3, LP 0,7, dừng `first`, chặn
+lặp 3-gram (+0,006 đến +0,009 CIDEr trung bình, ở cả sáu checkpoint). Bảng so sánh mô hình giữ
+giao thức cũ (không chặn lặp). Chi tiết: [EXPERIMENTS.md](EXPERIMENTS.md).
 
 Decoder mới trong `src/vic/models/decoder.py`, hiện thực bốn hàm `forward`, `init_state`, `step`,
 `reorder_state` và đăng ký vào `DECODERS["lstm_attention"]`. Không cần sửa `trainer.py`.
