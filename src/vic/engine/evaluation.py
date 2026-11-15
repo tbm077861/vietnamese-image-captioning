@@ -15,11 +15,17 @@ from torch.utils.data import DataLoader
 from vic.config import apply_overrides
 from vic.engine.checkpoint import load_checkpoint, model_from_checkpoint
 from vic.engine.data import load_experiment_data, make_image_loader
-from vic.metrics import compute_metrics
+from vic.metrics import caption_statistics, compute_metrics
 from vic.models import Captioner, beam_search, greedy_decode
 from vic.text.tokenizer import detokenize, to_syllables
 from vic.text.vocab import Vocabulary
 from vic.utils import get_device, write_json
+
+TEST_LOCK_MESSAGE = (
+    "The test split is locked: it is evaluated once, for the final model. Choose models, "
+    "hyper-parameters and decoding on the validation split; pass --final (final=True) only for "
+    "the final report."
+)
 
 
 def build_references(records: list[dict]) -> dict[str, list[list[str]]]:
@@ -86,12 +92,17 @@ def evaluate_checkpoint(
     beam_size: int | None = None,
     output: str | Path | None = None,
     overrides: list[str] | None = None,
+    final: bool = False,
 ) -> dict:
     """Caption every image of ``split`` with a checkpoint, score the captions, save the result.
 
-    The result (scores and all generated captions) is written to ``output``, by default
-    ``<run>/eval_<split>_beam<k>.json`` next to the checkpoint directory, and returned.
+    The result (scores, naturalness diagnostics and all generated captions) is written to
+    ``output``, by default ``<run>/eval_<split>_beam<k>.json`` next to the checkpoint directory,
+    and returned. The test split is locked: it is refused unless ``final`` is set, because every
+    model, hyper-parameter and decoding choice must be made on the validation split.
     """
+    if split == "test" and not final:
+        raise PermissionError(TEST_LOCK_MESSAGE)
     checkpoint = load_checkpoint(checkpoint_path)
     config = apply_overrides(checkpoint["config"], overrides)
     eval_config = config.get("eval", {})
@@ -116,7 +127,12 @@ def evaluate_checkpoint(
         length_penalty=float(eval_config.get("length_penalty", 0.7)),
         use_amp=device.type == "cuda",
     )
-    scores = score_captions(hypotheses, build_references(records))
+    references = build_references(records)
+    scores = score_captions(hypotheses, references)
+    diagnostics = caption_statistics(to_syllables(tokens) for tokens in hypotheses.values())
+    reference_diagnostics = caption_statistics(
+        caption for captions in references.values() for caption in captions
+    )
 
     if output is None:
         run_dir = Path(checkpoint_path).resolve().parent.parent
@@ -129,6 +145,8 @@ def evaluate_checkpoint(
         "beam_size": beam_size,
         "training_progress": checkpoint["progress"],
         "scores": scores,
+        "diagnostics": diagnostics,
+        "reference_diagnostics": reference_diagnostics,
         "predictions": {key: detokenize(tokens) for key, tokens in hypotheses.items()},
     }
     write_json(result, output, indent=1)

@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import torch
 
-from vic.config import data_paths
+from vic.config import data_paths, save_yaml
 from vic.data.annotations import make_record
 from vic.data.features import FeatureStore, create_feature_cache, write_feature_index
 from vic.data.prepare import build_vocabulary, tokenize_records
@@ -19,7 +19,9 @@ from vic.engine.evaluation import (
     generate_captions,
     score_captions,
 )
-from vic.engine.report import build_report
+from vic.engine.experiments import BEGIN_MARKER, END_MARKER, collect_runs, update_experiments_doc
+from vic.engine.report import build_comparison, build_report
+from vic.engine.sweep import run_sweep
 from vic.engine.trainer import run_training
 from vic.text import CaptionTokenizer
 from vic.utils import read_json, write_json
@@ -152,9 +154,14 @@ def test_evaluate_checkpoint_and_report(toy_config):
     run_training(config)
     run_dir = data_paths(config).raw_dir.parents[2] / "outputs" / "tiny"
     best = run_dir / "checkpoints" / "best.pt"
+    with pytest.raises(PermissionError, match="locked"):
+        evaluate_checkpoint(best, "test", beam_size=2)
+    assert not (run_dir / "eval_test_beam2.json").exists()
     for split in ("val", "test"):
-        result = evaluate_checkpoint(best, split, beam_size=2)
+        result = evaluate_checkpoint(best, split, beam_size=2, final=split == "test")
         saved = read_json(result["output"])
+        assert saved["diagnostics"]["num_captions"] == 6
+        assert saved["reference_diagnostics"]["num_captions"] == 12
         assert result["num_images"] == 6 and saved["scores"] == result["scores"]
         assert len(saved["predictions"]) == 6 and saved["split"] == split
     assert (run_dir / "eval_test_beam2.json").exists()
@@ -191,3 +198,98 @@ def test_resume_rejects_a_different_vocabulary(toy_config):
     write_json([*vocab, "mới"], paths.vocab)
     with pytest.raises(RuntimeError, match="vocabulary"):
         run_training(config, resume="auto")
+
+
+def _outputs(config):
+    return data_paths(config).raw_dir.parents[2] / "outputs"
+
+
+def test_summary_records_status_commit_and_time(toy_config):
+    config = copy.deepcopy(toy_config)
+    partial = run_training(config, max_steps=2)
+    assert partial["status"] == "interrupted"
+    summary = run_training(config, resume="auto")
+    assert summary["status"] == "completed" and summary["seed"] == 0
+    assert summary["parameter_count"] > 0 and summary["best_epoch"] >= 1
+    assert summary["train_seconds"] >= partial["train_seconds"] > 0
+    assert "git_commit" in summary and summary["init_from"] is None
+
+
+def test_failed_run_writes_a_summary(toy_config):
+    config = copy.deepcopy(toy_config)
+    config["train"]["lr"] = float("nan")  # the first loss is finite, the second is not
+    with pytest.raises(RuntimeError, match="Non-finite"):
+        run_training(config)
+    summary = read_json(_outputs(config) / "tiny" / "summary.json")
+    assert summary["status"] == "failed" and "Non-finite" in summary["error"]
+
+
+def test_init_from_copies_weights_but_not_progress(toy_config):
+    source = copy.deepcopy(toy_config)
+    source["run_name"] = "source"
+    run_training(source)
+    best = _outputs(source) / "source" / "checkpoints" / "best.pt"
+
+    target = copy.deepcopy(toy_config)
+    target["run_name"] = "target"
+    target["train"]["lr"] = 0.0  # weights must stay exactly those of the source
+    summary = run_training(target, init_from=str(best), max_steps=1)
+    assert summary["global_step"] == 1 and summary["init_from"] == str(best)
+    started = load_checkpoint(_outputs(target) / "target" / "checkpoints" / "last.pt")
+    assert started["progress"]["epoch"] == 0 and started["progress"]["best_score"] is None
+    assert started["config"]["train"]["init_from"] == str(best)
+    for name, tensor in load_checkpoint(best)["decoder"].items():
+        assert torch.equal(tensor, started["decoder"][name]), name
+
+
+def test_sweep_runs_seeds_skips_finished_and_survives_failures(toy_config, tmp_path):
+    good = tmp_path / "good.yaml"
+    save_yaml(toy_config, good)
+    broken_config = copy.deepcopy(toy_config)
+    broken_config["run_name"] = "broken"
+    broken_config["model"]["decoder"]["type"] = "does_not_exist"
+    broken = tmp_path / "broken.yaml"
+    save_yaml(broken_config, broken)
+    doc = tmp_path / "EXPERIMENTS.md"
+    lines = ["# Title", "", BEGIN_MARKER, "old", END_MARKER, "", "Keep me.", ""]
+    doc.write_text("\n".join(lines), encoding="utf-8")
+
+    results = run_sweep([broken, good], seeds=[0, 1], beam_sizes=(1, 2), doc_path=doc)
+    by_run = {entry["run"]: entry for entry in results}
+    assert set(by_run) == {"broken", "broken_seed1", "tiny", "tiny_seed1"}
+    assert by_run["broken"]["status"] == "failed" and "does_not_exist" in by_run["broken"]["error"]
+    assert by_run["tiny"]["status"] == by_run["tiny_seed1"]["status"] == "completed"
+    outputs = _outputs(toy_config)
+    assert (outputs / "tiny_seed1" / "eval_val_beam2.json").exists()
+    assert not list(outputs.glob("*/eval_test_*.json"))  # a sweep never touches the test split
+
+    text = doc.read_text(encoding="utf-8")
+    assert "Keep me." in text and "old" not in text
+    assert "`tiny_seed1`" in text and "**lỗi**" in text and "### Độ nhiễu giữa các seed" in text
+    rows = {row["run"]: row for row in collect_runs(outputs, beam_size=2)}
+    assert rows["tiny"]["status"] == "completed" and rows["tiny"]["cider"] is not None
+    assert rows["tiny"]["diagnostics"]["num_captions"] == 6 and rows["tiny"]["parameters"] > 0
+    assert rows["broken"]["status"] == "failed" and rows["broken"]["cider"] is None
+
+    again = run_sweep([good], seeds=[0, 1], beam_sizes=(1, 2), doc_path=None)
+    assert [entry["status"] for entry in again] == ["skipped", "skipped"]
+    assert again[0]["cider"] == by_run["tiny"]["cider"]
+
+
+def test_experiments_doc_is_created_and_comparison_uses_fixed_images(toy_config, tmp_path):
+    first = copy.deepcopy(toy_config)
+    second = copy.deepcopy(toy_config)
+    second["run_name"] = "other"
+    outputs = _outputs(toy_config)
+    for config in (first, second):
+        run_training(config)
+        evaluate_checkpoint(outputs / config["run_name"] / "checkpoints" / "best.pt", "val", 2)
+    doc = tmp_path / "docs" / "EXPERIMENTS.md"
+    rows = update_experiments_doc(outputs, doc, beam_size=2)
+    assert len(rows) == 2 and "`other`" in doc.read_text(encoding="utf-8")
+
+    comparison = build_comparison([outputs / "tiny", outputs / "other"], beam_size=2, samples=4)
+    assert comparison.count("**Ảnh `") == 4 and comparison.count("- `other`:") == 4
+    assert comparison == build_comparison(
+        [outputs / "tiny", outputs / "other"], beam_size=2, samples=4
+    )

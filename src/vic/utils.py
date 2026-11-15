@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import random
+import subprocess
 import sys
 from pathlib import Path
 
@@ -17,9 +18,28 @@ def set_seed(seed: int, deterministic: bool = False) -> None:
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
+    # Set both ways: several runs may share one process (scripts/run_sweep.py).
+    torch.backends.cudnn.deterministic = deterministic
     if deterministic:
-        torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
+
+
+def git_commit() -> str | None:
+    """Short hash of the checked-out commit, with "-dirty" when tracked files are modified.
+
+    Returns None outside a git checkout or when git is unavailable.
+    """
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+        status = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=no"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()  # fmt: skip
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return f"{commit}-dirty" if status else commit or None
 
 
 def get_device(name: str = "auto") -> torch.device:

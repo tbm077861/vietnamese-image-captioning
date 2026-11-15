@@ -6,9 +6,10 @@ from collections.abc import Mapping, Sequence
 
 from vic.metrics.bleu import corpus_bleu
 from vic.metrics.cider import cider_d
+from vic.metrics.diversity import caption_statistics
 from vic.metrics.meteor import meteor_exact
 
-__all__ = ["compute_metrics", "corpus_bleu", "cider_d", "meteor_exact"]
+__all__ = ["caption_statistics", "compute_metrics", "corpus_bleu", "cider_d", "meteor_exact"]
 
 
 def compute_metrics(
