@@ -159,4 +159,107 @@ class AttentionLSTMDecoder(nn.Module):
         return tuple(tensor.index_select(0, index) for tensor in state)
 
 
-DECODERS = {"lstm": LSTMDecoder, "lstm_attention": AttentionLSTMDecoder}
+TransformerState = tuple[torch.Tensor, torch.Tensor]
+
+
+class TransformerCaptionDecoder(nn.Module):
+    """Transformer decoder attending to the region grid through cross-attention.
+
+    The regions are projected to ``d_model`` and receive a learned position embedding each;
+    tokens receive a learned position embedding and share their embedding matrix with the
+    output layer. Layers are pre-norm. Step-by-step decoding keeps ``(memory, prefix)`` as
+    state and re-runs the decoder on the prefix at every step: captions are at most a few
+    dozen tokens long, so this stays cheap and needs no cache of per-layer activations.
+    """
+
+    def __init__(
+        self,
+        vocab_size: int,
+        feature_dim: int,
+        d_model: int = 512,
+        num_layers: int = 3,
+        num_heads: int = 8,
+        ff_dim: int = 2048,
+        dropout: float = 0.1,
+        max_positions: int = 64,
+        max_regions: int = 256,
+        pad_id: int = 0,
+        feature_norm: bool = False,
+    ) -> None:
+        super().__init__()
+        self.pad_id = pad_id
+        self.d_model = d_model
+        self.max_positions = max_positions
+        self.max_regions = max_regions
+        self.feature_norm = nn.LayerNorm(feature_dim) if feature_norm else nn.Identity()
+        self.project = nn.Linear(feature_dim, d_model)
+        self.region_positions = nn.Parameter(torch.zeros(1, max_regions, d_model))
+        self.memory_norm = nn.LayerNorm(d_model)
+        self.embedding = nn.Embedding(vocab_size, d_model, padding_idx=pad_id)
+        self.token_positions = nn.Embedding(max_positions, d_model)
+        self.dropout = nn.Dropout(dropout)
+        layer = nn.TransformerDecoderLayer(
+            d_model, num_heads, ff_dim, dropout, batch_first=True, norm_first=True
+        )
+        self.layers = nn.TransformerDecoder(layer, num_layers, norm=nn.LayerNorm(d_model))
+        self.output = nn.Linear(d_model, vocab_size)
+        self.output.weight = self.embedding.weight  # weight tying
+        nn.init.normal_(self.embedding.weight, std=d_model**-0.5)
+        nn.init.normal_(self.token_positions.weight, std=0.02)
+        nn.init.normal_(self.region_positions, std=0.02)
+        with torch.no_grad():
+            self.embedding.weight[pad_id].zero_()
+
+    def encode(self, features: torch.Tensor) -> torch.Tensor:
+        """Project the region grid to the decoder width: (batch, regions, d_model)."""
+        if features.dim() == 2:  # a pooled vector is a grid with a single region
+            features = features.unsqueeze(1)
+        regions = features.size(1)
+        if regions > self.max_regions:
+            raise ValueError(f"{regions} regions exceed model.decoder.max_regions")
+        memory = self.project(self.feature_norm(features.float()))
+        memory = memory + self.region_positions[:, :regions]
+        return self.dropout(self.memory_norm(memory))
+
+    def decode(self, memory: torch.Tensor, input_ids: torch.Tensor) -> torch.Tensor:
+        """Hidden states for every position of ``input_ids``: (batch, time, d_model)."""
+        length = input_ids.size(1)
+        if length > self.max_positions:
+            raise ValueError(f"{length} tokens exceed model.decoder.max_positions")
+        positions = torch.arange(length, device=input_ids.device)
+        embedded = self.embedding(input_ids) * self.d_model**0.5 + self.token_positions(positions)
+        causal = torch.ones(length, length, dtype=torch.bool, device=input_ids.device).triu(1)
+        return self.layers(
+            self.dropout(embedded),
+            memory,
+            tgt_mask=causal,
+            tgt_key_padding_mask=input_ids == self.pad_id,
+        )
+
+    def forward(self, features: torch.Tensor, input_ids: torch.Tensor) -> torch.Tensor:
+        return self.output(self.decode(self.encode(features), input_ids))
+
+    def init_state(self, features: torch.Tensor) -> TransformerState:
+        memory = self.encode(features)
+        prefix = torch.empty(memory.size(0), 0, dtype=torch.long, device=memory.device)
+        return memory, prefix
+
+    def step(
+        self, tokens: torch.Tensor, state: TransformerState
+    ) -> tuple[torch.Tensor, TransformerState]:
+        memory, prefix = state
+        prefix = torch.cat([prefix, tokens.unsqueeze(1)], dim=1)
+        hidden = self.decode(memory, prefix)
+        return self.output(hidden[:, -1]), (memory, prefix)
+
+    @staticmethod
+    def reorder_state(state: TransformerState, index: torch.Tensor) -> TransformerState:
+        memory, prefix = state
+        return memory.index_select(0, index), prefix.index_select(0, index)
+
+
+DECODERS = {
+    "lstm": LSTMDecoder,
+    "lstm_attention": AttentionLSTMDecoder,
+    "transformer": TransformerCaptionDecoder,
+}

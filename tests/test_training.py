@@ -352,3 +352,21 @@ def test_attention_decoder_trains_end_to_end(toy_config):
     best = _outputs(config) / "tiny" / "checkpoints" / "best.pt"
     result = evaluate_checkpoint(best, "val", beam_size=2, overrides=["eval.beam_stop=best"])
     assert result["decoding"]["beam_stop"] == "best" and result["scores"]["BLEU-1"] > 0.5
+
+
+def test_transformer_decoder_trains_end_to_end(toy_config):
+    config = copy.deepcopy(toy_config)
+    config["train"].update({"epochs": 40, "lr": 0.003, "label_smoothing": 0.1})
+    config["model"]["decoder"] = {
+        "type": "transformer",
+        "d_model": 32,
+        "num_layers": 2,
+        "num_heads": 4,
+        "ff_dim": 64,
+        "dropout": 0.0,
+    }
+    summary = run_training(config)
+    assert summary["last_loss"] < 0.6 * summary["first_loss"] and summary["best_score"] > 0
+    best = _outputs(config) / "tiny" / "checkpoints" / "best.pt"
+    result = evaluate_checkpoint(best, "val", beam_size=2)
+    assert result["scores"]["BLEU-1"] > 0.5
