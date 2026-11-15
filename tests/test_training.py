@@ -19,7 +19,13 @@ from vic.engine.evaluation import (
     generate_captions,
     score_captions,
 )
-from vic.engine.experiments import BEGIN_MARKER, END_MARKER, collect_runs, update_experiments_doc
+from vic.engine.experiments import (
+    BEGIN_MARKER,
+    END_MARKER,
+    collect_runs,
+    experiments_table,
+    update_experiments_doc,
+)
 from vic.engine.report import build_comparison, build_report
 from vic.engine.sweep import run_sweep
 from vic.engine.trainer import run_training
@@ -177,6 +183,14 @@ def test_evaluate_checkpoint_and_report(toy_config):
     # The same seed always selects the same examples.
     assert report == build_report(run_dir, samples=3, beam_size=2, worst=2, seed=1)
 
+    blocked = evaluate_checkpoint(best, "val", decoding={"no_repeat_ngram_size": 2})
+    assert blocked["output"].endswith("eval_val_beam2_norepeat2.json")
+    assert blocked["decoding"]["no_repeat_ngram_size"] == 2 and blocked["beam_size"] == 2
+    assert read_json(run_dir / "eval_val_beam2.json")["decoding"]["no_repeat_ngram_size"] == 0
+    with_blocking = build_report(run_dir, samples=3, beam_size=2, worst=2, seed=1)
+    assert "| val | beam 2, LP 0,7, dừng first, chặn lặp 2-gram |" in with_blocking
+    assert with_blocking.count("**Ảnh `") == 5
+
 
 def test_fresh_run_never_overwrites_checkpoints_silently(toy_config):
     config = copy.deepcopy(toy_config)
@@ -213,6 +227,27 @@ def test_summary_records_status_commit_and_time(toy_config):
     assert summary["parameter_count"] > 0 and summary["best_epoch"] >= 1
     assert summary["train_seconds"] >= partial["train_seconds"] > 0
     assert "git_commit" in summary and summary["init_from"] is None
+    assert summary["overrides"] is None
+    assert [item["epoch"] for item in summary["resume_history"]] == [0]
+    assert summary["resume_history"][0]["config_changes"] == []
+
+
+def test_resume_records_config_changes(toy_config):
+    config = copy.deepcopy(toy_config)
+    run_training(config, max_steps=4)  # stops in epoch 2
+    config["data"]["features_in_memory"] = False
+    config["overrides"] = ["data.features_in_memory=false"]
+    summary = run_training(config, resume="auto")
+    assert summary["status"] == "completed" and summary["overrides"] == config["overrides"]
+    (resume,) = summary["resume_history"]
+    assert resume["epoch"] == 1 and resume["global_step"] == 4
+    assert resume["config_changes"] == ["data.features_in_memory: True -> False"]
+    rows = {row["run"]: row for row in collect_runs(_outputs(config), beam_size=2)}
+    assert rows["tiny"]["resume_history"] == summary["resume_history"]
+    table = "\n".join(experiments_table(list(rows.values()), beam_size=2))
+    assert (
+        "ngắt rồi resume từ epoch 1" in table and "override: data.features_in_memory=false" in table
+    )
 
 
 def test_failed_run_writes_a_summary(toy_config):
@@ -254,13 +289,19 @@ def test_sweep_runs_seeds_skips_finished_and_survives_failures(toy_config, tmp_p
     lines = ["# Title", "", BEGIN_MARKER, "old", END_MARKER, "", "Keep me.", ""]
     doc.write_text("\n".join(lines), encoding="utf-8")
 
-    results = run_sweep([broken, good], seeds=[0, 1], beam_sizes=(1, 2), doc_path=doc)
+    results = run_sweep(
+        [broken, good], seeds=[0, 1], beam_sizes=(1, 2), overrides=["eval.batch_size=8"],
+        doc_path=doc,
+    )  # fmt: skip
     by_run = {entry["run"]: entry for entry in results}
     assert set(by_run) == {"broken", "broken_seed1", "tiny", "tiny_seed1"}
     assert by_run["broken"]["status"] == "failed" and "does_not_exist" in by_run["broken"]["error"]
     assert by_run["tiny"]["status"] == by_run["tiny_seed1"]["status"] == "completed"
     outputs = _outputs(toy_config)
     assert (outputs / "tiny_seed1" / "eval_val_beam2.json").exists()
+    assert (outputs / "tiny_seed1" / "eval_val_beam3_norepeat3.json").exists()
+    assert set(by_run["tiny"]["cider"]) == {"beam 1", "beam 2", "chosen"}
+    assert read_json(outputs / "tiny" / "summary.json")["overrides"] == ["eval.batch_size=8"]
     assert not list(outputs.glob("*/eval_test_*.json"))  # a sweep never touches the test split
 
     text = doc.read_text(encoding="utf-8")
@@ -269,6 +310,7 @@ def test_sweep_runs_seeds_skips_finished_and_survives_failures(toy_config, tmp_p
     rows = {row["run"]: row for row in collect_runs(outputs, beam_size=2)}
     assert rows["tiny"]["status"] == "completed" and rows["tiny"]["cider"] is not None
     assert rows["tiny"]["diagnostics"]["num_captions"] == 6 and rows["tiny"]["parameters"] > 0
+    assert rows["tiny"]["cider_chosen"] is not None and "giải mã chốt" in text
     assert rows["broken"]["status"] == "failed" and rows["broken"]["cider"] is None
 
     again = run_sweep([good], seeds=[0, 1], beam_sizes=(1, 2), doc_path=None)

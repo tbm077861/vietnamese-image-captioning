@@ -11,7 +11,7 @@ import torch
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import LambdaLR
 
-from vic.config import save_yaml
+from vic.config import config_differences, save_yaml
 from vic.engine.checkpoint import load_checkpoint, save_checkpoint
 from vic.engine.data import load_experiment_data, make_image_loader, make_pair_loader
 from vic.engine.evaluation import build_references, format_scores, generate_captions, score_captions
@@ -188,6 +188,7 @@ def _train(
         "best_epoch": None,
         "epochs_without_improvement": 0,
         "elapsed_seconds": 0.0,  # wall-clock training time, accumulated across resumes
+        "resume_history": [],  # one entry per resume, with the config changes it brought
     }
     if checkpoint is None and init_from:
         initial = load_checkpoint(init_from)
@@ -209,6 +210,17 @@ def _train(
         if checkpoint.get("cuda_rng") is not None and device.type == "cuda":
             torch.cuda.set_rng_state_all(checkpoint["cuda_rng"])
         progress = {**progress, **checkpoint["progress"]}
+        changes = config_differences(checkpoint["config"], config)
+        progress["resume_history"] = [
+            *progress["resume_history"],
+            {
+                "epoch": progress["epoch"],
+                "global_step": progress["global_step"],
+                "config_changes": changes,
+            },
+        ]
+        if changes:
+            logger.info(f"Config changed on resume: {'; '.join(changes)}")
     else:
         save_yaml(config, run_dir / "config.yaml")
 
@@ -392,6 +404,8 @@ def _train(
         "seed": seed,
         "git_commit": git_commit(),
         "init_from": init_from,
+        "overrides": config.get("overrides"),
+        "resume_history": progress["resume_history"],
         "parameter_count": parameter_count,
         "train_seconds": elapsed_before + time.perf_counter() - run_start,
         "best_epoch": progress["best_epoch"],

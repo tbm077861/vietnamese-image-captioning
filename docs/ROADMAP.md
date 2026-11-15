@@ -184,6 +184,18 @@ Báo cáo gửi chủ dự án phải có:
    chạy đánh giá trên tập test.
 4. Đề xuất cụ thể cho Bước 5–6, và phần nào nên ưu tiên làm trước.
 
+### Việc phải làm trước Bước 5
+
+Phát hiện trong Bước 3; làm xong trước khi chạy lượt quét cấu hình:
+
+1. **Tách tiến trình cho mỗi run** trong `scripts/run_sweep.py`. Hiện mọi cấu hình chạy nối tiếp
+   trong cùng một tiến trình Python; bộ nhớ của run trước có thể chưa được trả hết khi run sau
+   nạp cache 3,67 GB. Một lượt chạy Bước 3 đã bị dừng vì máy gần hết RAM.
+2. **Cho encoder ViT chạy float32 khi trích cache và khi suy luận.** Đặc trưng CLIP tính ở
+   float16 phụ thuộc cỡ lô (lệch khoảng 0,5% theo L2), nên đặc trưng lúc `predict.py` chạy từng
+   ảnh hơi khác cache dùng để huấn luyện. Chi tiết: [MODELS.md](MODELS.md). Phải trích lại cache
+   và huấn luyện lại mô hình được chọn sau khi đổi.
+
 ### Bước 5 – Tinh chỉnh ⬜ (chưa được duyệt chạy)
 
 Trên cặp encoder – decoder tốt nhất, tối đa 15 run, mỗi run đổi một yếu tố: label smoothing (0 và

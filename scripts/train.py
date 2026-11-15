@@ -42,6 +42,8 @@ def main() -> None:
     args = parser.parse_args()
 
     config = load_config(args.config, args.overrides)
+    if args.overrides:
+        config["overrides"] = list(args.overrides)  # recorded in config.yaml / summary
     run_training(
         config,
         resume=args.resume,

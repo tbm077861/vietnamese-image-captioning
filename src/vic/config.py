@@ -116,6 +116,29 @@ def load_any_config(path: str | Path, overrides: list[str] | None = None) -> dic
     return {"dataset": config}
 
 
+def flatten_config(config: dict, prefix: str = "") -> dict[str, Any]:
+    """``{"a": {"b": 1}}`` -> ``{"a.b": 1}``."""
+    flat: dict[str, Any] = {}
+    for key, value in config.items():
+        name = f"{prefix}{key}"
+        if isinstance(value, dict):
+            flat.update(flatten_config(value, f"{name}."))
+        else:
+            flat[name] = value
+    return flat
+
+
+def config_differences(old: dict, new: dict, ignore: tuple[str, ...] = ("overrides",)) -> list[str]:
+    """``"key: old -> new"`` for every setting that differs (top-level ``ignore`` keys skipped)."""
+    before, after = flatten_config(old), flatten_config(new)
+    changes = []
+    for key in sorted(set(before) | set(after)):
+        if key.split(".")[0] in ignore or before.get(key) == after.get(key):
+            continue
+        changes.append(f"{key}: {before.get(key)!r} -> {after.get(key)!r}")
+    return changes
+
+
 @dataclass(frozen=True)
 class DataPaths:
     raw_dir: Path  # downloaded files, exactly as published

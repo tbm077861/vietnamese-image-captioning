@@ -13,6 +13,12 @@ from fnmatch import fnmatch
 from pathlib import Path
 
 from vic.config import load_yaml
+from vic.engine.protocol import (
+    CHOSEN_DECODING,
+    PROTOCOL_DECODING,
+    decoding_label,
+    evaluation_filename,
+)
 from vic.metrics import caption_statistics
 from vic.utils import read_json
 
@@ -65,8 +71,8 @@ def _train_minutes(summary: dict) -> tuple[float | None, bool]:
     return per_epoch * epochs, True
 
 
-def _evaluation(run_dir: Path, beam_size: int) -> dict | None:
-    path = run_dir / f"eval_val_beam{beam_size}.json"
+def _evaluation(run_dir: Path, decoding: dict) -> dict | None:
+    path = run_dir / evaluation_filename("val", decoding)
     return read_json(path) if path.exists() else None
 
 
@@ -94,12 +100,16 @@ def collect_run(run_dir: Path, beam_size: int = 3) -> dict:
         "cider": None,
         "bleu4": None,
         "cider_greedy": None,
+        "cider_chosen": None,
+        "bleu4_chosen": None,
+        "overrides": summary.get("overrides") or [],
+        "resume_history": summary.get("resume_history") or [],
         "diagnostics": None,
         "reference_diagnostics": None,
     }
     row["train_minutes"], row["train_minutes_estimated"] = _train_minutes(summary)
 
-    evaluation = _evaluation(run_dir, beam_size)
+    evaluation = _evaluation(run_dir, {**PROTOCOL_DECODING, "beam_size": beam_size})
     if evaluation is not None:
         row["cider"] = evaluation["scores"]["CIDEr"]
         row["bleu4"] = evaluation["scores"]["BLEU-4"]
@@ -108,9 +118,13 @@ def collect_run(run_dir: Path, beam_size: int = 3) -> dict:
             caption.split() for caption in evaluation["predictions"].values()
         )
         row["reference_diagnostics"] = evaluation.get("reference_diagnostics")
-    greedy = _evaluation(run_dir, 1)
+    greedy = _evaluation(run_dir, {**PROTOCOL_DECODING, "beam_size": 1})
     if greedy is not None:
         row["cider_greedy"] = greedy["scores"]["CIDEr"]
+    chosen = _evaluation(run_dir, CHOSEN_DECODING)
+    if chosen is not None:
+        row["cider_chosen"] = chosen["scores"]["CIDEr"]
+        row["bleu4_chosen"] = chosen["scores"]["BLEU-4"]
     return row
 
 
@@ -138,11 +152,11 @@ def _cell(value, pattern: str = "{}") -> str:
 def experiments_table(rows: list[dict], beam_size: int = 3) -> list[str]:
     header = [
         "Run", "Encoder", "Decoder", "Seed", f"CIDEr (beam {beam_size})", "BLEU-4",
-        "CIDEr (greedy)", "Câu khác nhau", "Âm tiết khác nhau", "Độ dài TB", "Lặp 2-gram (%)",
-        "Lặp 3-gram (%)", "Tham số (triệu)", "Huấn luyện (phút)", "VRAM đỉnh (MB)",
-        "Epoch tốt nhất", "Commit", "Ghi chú",
+        "CIDEr (greedy)", "CIDEr (giải mã chốt)", "BLEU-4 (giải mã chốt)", "Câu khác nhau",
+        "Âm tiết khác nhau", "Độ dài TB", "Lặp 2-gram (%)", "Lặp 3-gram (%)", "Tham số (triệu)",
+        "Huấn luyện (phút)", "VRAM đỉnh (MB)", "Epoch tốt nhất", "Commit", "Ghi chú",
     ]  # fmt: skip
-    lines = ["| " + " | ".join(header) + " |", "|---|---|---|---:" + "|---:" * 12 + "|---|---|"]
+    lines = ["| " + " | ".join(header) + " |", "|---|---|---|---:" + "|---:" * 14 + "|---|---|"]
     for row in rows:
         stats = row["diagnostics"] or {}
         minutes = _cell(row["train_minutes"], "{:.1f}")
@@ -152,6 +166,13 @@ def experiments_table(rows: list[dict], beam_size: int = 3) -> list[str]:
         if row["status"] != "completed":
             note = STATUS_NOTES.get(row["status"], row["status"])
             notes.append(f"**{note}**" + (f": {row['error']}" if row["error"] else ""))
+        if row["overrides"]:
+            notes.append("override: " + ", ".join(row["overrides"]))
+        for resume in row["resume_history"]:
+            text = f"ngắt rồi resume từ epoch {resume['epoch']}"
+            if resume["config_changes"]:
+                text += " (cấu hình đổi khi resume: " + "; ".join(resume["config_changes"]) + ")"
+            notes.append(text)
         cells = [
             f"`{row['run']}`",
             row["encoder"],
@@ -160,6 +181,8 @@ def experiments_table(rows: list[dict], beam_size: int = 3) -> list[str]:
             _cell(row["cider"], "{:.4f}"),
             _cell(None if row["bleu4"] is None else row["bleu4"] * 100, "{:.2f}"),
             _cell(row["cider_greedy"], "{:.4f}"),
+            _cell(row["cider_chosen"], "{:.4f}"),
+            _cell(None if row["bleu4_chosen"] is None else row["bleu4_chosen"] * 100, "{:.2f}"),
             _cell(stats.get("distinct_captions")),
             _cell(stats.get("distinct_tokens")),
             _cell(stats.get("mean_length"), "{:.1f}"),
@@ -211,16 +234,21 @@ def seed_noise(rows: list[dict]) -> list[dict]:
             continue
         ciders = [member["cider"] for member in members]
         bleus = [member["bleu4"] * 100 for member in members]
-        result.append(
-            {
-                "group": name,
-                "seeds": sorted(member["seed"] for member in members),
-                "cider_mean": statistics.fmean(ciders),
-                "cider_std": statistics.stdev(ciders),
-                "bleu4_mean": statistics.fmean(bleus),
-                "bleu4_std": statistics.stdev(bleus),
-            }
-        )
+        item = {
+            "group": name,
+            "seeds": sorted(member["seed"] for member in members),
+            "cider_mean": statistics.fmean(ciders),
+            "cider_std": statistics.stdev(ciders),
+            "bleu4_mean": statistics.fmean(bleus),
+            "bleu4_std": statistics.stdev(bleus),
+            "cider_chosen_mean": None,
+            "cider_chosen_std": None,
+        }
+        chosen = [member["cider_chosen"] for member in members]
+        if all(value is not None for value in chosen):
+            item["cider_chosen_mean"] = statistics.fmean(chosen)
+            item["cider_chosen_std"] = statistics.stdev(chosen)
+        result.append(item)
     return result
 
 
@@ -235,20 +263,36 @@ def seed_noise_table(rows: list[dict], beam_size: int = 3) -> list[str]:
         "Trung bình ± độ lệch chuẩn mẫu của các run cùng cấu hình, chỉ khác seed "
         f"(beam {beam_size}).",
         "",
-        "| Cấu hình | Seed | CIDEr | BLEU-4 |",
-        "|---|---|---:|---:|",
+        "| Cấu hình | Seed | CIDEr | BLEU-4 | CIDEr (giải mã chốt) |",
+        "|---|---|---:|---:|---:|",
     ]
     for item in noise:
         seeds = ", ".join(str(seed) for seed in item["seeds"])
+        chosen = "—"
+        if item["cider_chosen_mean"] is not None:
+            chosen = f"{item['cider_chosen_mean']:.4f} ± {item['cider_chosen_std']:.4f}"
         lines.append(
             f"| `{item['group']}` | {seeds} | {item['cider_mean']:.4f} ± {item['cider_std']:.4f} | "
-            f"{item['bleu4_mean']:.2f} ± {item['bleu4_std']:.2f} |"
+            f"{item['bleu4_mean']:.2f} ± {item['bleu4_std']:.2f} | {chosen} |"
         )
     return lines
 
 
+def decoding_note(beam_size: int = 3) -> list[str]:
+    protocol = decoding_label({**PROTOCOL_DECODING, "beam_size": beam_size})
+    chosen = decoding_label(CHOSEN_DECODING)
+    return [
+        f'**Giải mã.** Cột "CIDEr (beam {beam_size})", "BLEU-4" và "CIDEr (greedy)" dùng giao '
+        f"thức so sánh ({protocol}; greedy cũng không chặn lặp): CIDEr beam {beam_size} là tiêu "
+        'chí chọn mô hình. Cột "giải mã chốt" dùng cách giải mã chốt ở Bước 2 '
+        f"({chosen}), áp cho mọi cấu hình. Các chỉ số canh độ tự nhiên tính trên giao thức so "
+        "sánh.",
+        "",
+    ]
+
+
 def render_experiments(rows: list[dict], beam_size: int = 3) -> str:
-    lines = experiments_table(rows, beam_size) + reference_line(rows)
+    lines = decoding_note(beam_size) + experiments_table(rows, beam_size) + reference_line(rows)
     lines += seed_noise_table(rows, beam_size)
     return "\n".join(lines)
 

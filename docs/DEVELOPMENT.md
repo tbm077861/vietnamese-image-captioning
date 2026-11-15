@@ -199,6 +199,9 @@ Các thư mục sau đã được tạo (không nằm trong git), không cần c
 
 ### Việc còn dở
 
+- Trước Bước 5: tách tiến trình cho mỗi run trong `run_sweep.py` (hiện dùng chung một tiến
+  trình) và cho encoder ViT chạy float32 (xem "Việc phải làm trước Bước 5" trong
+  [ROADMAP.md](ROADMAP.md)).
 - Dừng sớm với ngưỡng 5 epoch có thể dừng trước khi hội tụ (seed 44 của baseline dừng ở epoch
   19); cân nhắc nới ngưỡng ở lượt tinh chỉnh (Bước 5).
 - Chưa có CI; chạy `pytest` và `ruff check .` trước mỗi lần mở Pull Request. Nên chạy test trên

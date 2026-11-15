@@ -2,7 +2,7 @@
 
 import pytest
 
-from vic.config import data_paths, load_config, save_yaml
+from vic.config import config_differences, data_paths, load_config, save_yaml
 
 
 def test_base_config_is_inherited_and_merged_key_by_key(tmp_path):
@@ -53,3 +53,17 @@ def test_circular_base_config_is_rejected(tmp_path):
     save_yaml({"base_config": str(first), "run_name": "b"}, second)
     with pytest.raises(ValueError, match="Circular"):
         load_config(first)
+
+
+def test_config_differences_lists_changed_leaves():
+    old = {"data": {"features_in_memory": True}, "train": {"lr": 0.1}, "overrides": None}
+    new = {
+        "data": {"features_in_memory": False},
+        "train": {"lr": 0.1, "epochs": 3},
+        "overrides": ["x=1"],
+    }
+    assert config_differences(old, new) == [
+        "data.features_in_memory: True -> False",
+        "train.epochs: None -> 3",
+    ]
+    assert config_differences(old, old) == []

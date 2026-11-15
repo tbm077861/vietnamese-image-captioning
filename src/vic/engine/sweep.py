@@ -1,9 +1,11 @@
 """Run a list of experiment configs one after another, unattended.
 
 For every config: train (finished runs are skipped, unfinished ones resume from ``last.pt``),
-evaluate ``best.pt`` on the validation split with each requested beam size, then refresh the
-experiment table. A run that fails is recorded and the sweep moves on to the next one; calling
-the sweep again retries it. The test split is never touched.
+evaluate ``best.pt`` on the validation split with each requested beam size under the comparison
+decoding and once with the chosen decoding (``vic.engine.protocol``), then refresh the
+experiment table. Missing evaluations of finished runs are added. A run that fails is recorded
+and the sweep moves on to the next one; calling the sweep again retries it. The test split is
+never touched.
 """
 
 from __future__ import annotations
@@ -19,6 +21,7 @@ import torch
 from vic.config import load_config, save_yaml
 from vic.engine.evaluation import evaluate_checkpoint
 from vic.engine.experiments import run_status, update_experiments_doc
+from vic.engine.protocol import CHOSEN_DECODING, PROTOCOL_DECODING, evaluation_filename
 from vic.engine.trainer import run_training
 from vic.utils import git_commit, read_json, setup_logging, write_json
 
@@ -49,6 +52,8 @@ def sweep_configs(
     configs = []
     for path in expand_config_paths(paths):
         base = load_config(path, overrides)
+        if overrides:
+            base["overrides"] = list(overrides)  # recorded in config.yaml and summary.json
         own_seed = int(base.get("seed", 42))
         for seed in seeds or [own_seed]:
             config = copy.deepcopy(base)
@@ -63,7 +68,7 @@ def sweep_configs(
     return configs
 
 
-def _run_one(config: dict, beam_sizes: Sequence[int]) -> dict:
+def _run_one(config: dict, beam_sizes: Sequence[int], overrides: list[str] | None) -> dict:
     run_dir = Path(config.get("output_dir", "outputs")) / config["run_name"]
     summary_path = run_dir / "summary.json"
     summary = read_json(summary_path) if summary_path.exists() else None
@@ -71,13 +76,16 @@ def _run_one(config: dict, beam_sizes: Sequence[int]) -> dict:
     if trained:
         run_training(config, resume="auto")
     best = run_dir / "checkpoints" / "best.pt"
+    decodings = {f"beam {k}": {**PROTOCOL_DECODING, "beam_size": k} for k in beam_sizes}
+    decodings["chosen"] = dict(CHOSEN_DECODING)
     scores = {}
-    for beam_size in beam_sizes:
-        output = run_dir / f"eval_val_beam{beam_size}.json"
+    for label, decoding in decodings.items():
+        output = run_dir / evaluation_filename("val", decoding)
         if trained or not output.exists():
-            scores[beam_size] = evaluate_checkpoint(best, "val", beam_size)["scores"]["CIDEr"]
+            result = evaluate_checkpoint(best, "val", overrides=overrides, decoding=decoding)
+            scores[label] = result["scores"]["CIDEr"]
         else:
-            scores[beam_size] = read_json(output)["scores"]["CIDEr"]
+            scores[label] = read_json(output)["scores"]["CIDEr"]
     return {"status": "completed" if trained else "skipped", "cider": scores}
 
 
@@ -98,7 +106,7 @@ def run_sweep(
         logger.info(f"=== [{position}/{len(configs)}] {name} ===")
         entry = {"run": name, "status": "failed", "cider": {}, "error": None}
         try:
-            entry.update(_run_one(config, beam_sizes))
+            entry.update(_run_one(config, beam_sizes, overrides))
         except Exception as error:  # one broken run must not stop the sweep
             entry["error"] = f"{type(error).__name__}: {error}"
             logger = setup_logging()
@@ -118,7 +126,7 @@ def run_sweep(
     logger = setup_logging()
     logger.info("=== Sweep finished ===")
     for entry in results:
-        cider = ", ".join(f"beam {k}: {v:.4f}" for k, v in entry["cider"].items())
+        cider = ", ".join(f"{k}: {v:.4f}" for k, v in entry["cider"].items())
         logger.info(f"{entry['run']}: {entry['status']} {cider}{entry['error'] or ''}")
     return results
 
