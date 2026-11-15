@@ -88,6 +88,23 @@ Phương án đã loại:
 | Tinh chỉnh mô hình vision-language lớn có sẵn | Mục tiêu dự án là tự xây và hiểu từng thành phần; có thể dùng làm mốc tham chiếu về sau |
 | Cắt giữa ảnh (center crop) | Mất chủ thể ở rìa ảnh, trong khi caption mô tả toàn cảnh |
 
+### Encoder CLIP và SigLIP (Giai đoạn 5)
+
+- `ImageEncoder` bọc ba họ mô hình sau cùng một sổ đăng ký `ENCODERS`: ResNet (`torchvision`),
+  nhánh ảnh của CLIP ViT-B/16 và của SigLIP ViT-B/16 (`transformers`). Nguồn, giấy phép và commit
+  ghim của trọng số: [MODELS.md](MODELS.md).
+- Đầu ra của cả hai ViT là lưới 14 × 14 = 196 vùng, 768 chiều. CLIP lấy token patch của **lớp áp
+  chót** và bỏ token `[CLS]`: lớp cuối của CLIP chỉ được huấn luyện qua token `[CLS]`. SigLIP lấy
+  lớp cuối (không có token `[CLS]`).
+- Mỗi encoder có hệ số chuẩn hóa ảnh riêng (`NORMALIZATION` trong `vic.data.image`); ảnh vẫn
+  được co về 224 × 224 không cắt, như với ResNet.
+- Đặc trưng ViT không cùng thang đo (CLIP có vài chiều trị tuyệt đối gần 90, SigLIP có độ lệch
+  chuẩn khoảng 2,3), nên decoder có tùy chọn `feature_norm: true` (LayerNorm trên đặc trưng đầu
+  vào), bật trong các cấu hình dùng ViT.
+- **Kế thừa cấu hình:** file thí nghiệm có thể khai báo `base_config: <file>` và chỉ ghi phần khác
+  (gộp theo từng khóa con; `notes` không được kế thừa). Nhờ vậy mỗi thí nghiệm "đổi một yếu tố"
+  chỉ vài dòng và nhìn vào là thấy yếu tố nào đổi.
+
 ## 6. Cache đặc trưng
 
 Encoder đóng băng nên đặc trưng của mỗi ảnh không đổi giữa các epoch. `extract_features.py`
@@ -205,5 +222,6 @@ Chi tiết từng giai đoạn nằm trong [ROADMAP.md](ROADMAP.md). Các điể
 
 - Lưới đặc trưng 49 vùng trong cache: dùng ngay cho decoder attention hoặc Transformer.
 - `DECODERS` trong `src/vic/models/decoder.py`: nơi đăng ký decoder mới.
-- `BACKBONES` trong `src/vic/models/encoder.py`: nơi thêm encoder mới.
+- `ENCODERS` trong `src/vic/models/encoder.py`: nơi thêm encoder mới (họ mô hình, số chiều,
+  cách chuẩn hóa ảnh, nguồn và commit ghim của trọng số). Ghi giấy phép vào `docs/MODELS.md`.
 - `CaptionPredictor` trong `src/vic/engine/inference.py`: lớp demo Gradio sẽ gọi.

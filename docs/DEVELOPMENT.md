@@ -91,6 +91,8 @@ python scripts/prepare_data.py --config configs/baseline_lstm.yaml
 
 # Cache đặc trưng ảnh (một lần cho mỗi encoder / kích thước ảnh)
 python scripts/extract_features.py --config configs/baseline_lstm.yaml
+python scripts/extract_features.py --config configs/lstm_clip_b16.yaml     # CLIP ViT-B/16, 3,67 GB
+python scripts/extract_features.py --config configs/lstm_siglip_b16.yaml   # SigLIP ViT-B/16, 3,67 GB
 
 # Huấn luyện, tiếp tục khi bị ngắt, chạy thử nhanh
 python scripts/train.py --config configs/baseline_lstm.yaml
@@ -131,10 +133,12 @@ Trên Windows, khi in tiếng Việt ra console bị lỗi mã hóa thì thêm `
 - Đường dẫn dữ liệu và kết quả nằm dưới `data/` và `outputs/` (đều bị git bỏ qua).
 - Mỗi module có test tương ứng trong `tests/`.
 - Decoder mới hiện thực giao diện chung (`forward`, `init_state`, `step`, `reorder_state`) và
-  đăng ký vào `DECODERS`; dataset mới thêm YAML trong `configs/datasets/` và, nếu cần, một
+  đăng ký vào `DECODERS`; encoder mới đăng ký vào `ENCODERS` (ghi giấy phép vào
+  `docs/MODELS.md` trước khi tải trọng số); dataset mới thêm YAML trong `configs/datasets/` và, nếu cần, một
   adapter trong `src/vic/data/sources.py`.
 - Mỗi thí nghiệm có một file YAML riêng trong `configs/` và một `run_name` riêng; không sửa
-  file cấu hình của thí nghiệm đã chạy.
+  file cấu hình của thí nghiệm đã chạy. Thí nghiệm mới nên kế thừa bằng `base_config:` và chỉ
+  ghi phần khác.
 - Các Pull Request của nhiều giai đoạn xếp chồng lên nhau: merge theo đúng thứ tự, dùng
   "Create a merge commit" (không squash).
 
