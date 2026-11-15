@@ -166,7 +166,10 @@ Trên Windows, khi in tiếng Việt ra console bị lỗi mã hóa thì thêm `
     0,6512 ± 0,0046 (ngang nhau trong mức nhiễu), đều hơn ResNet-50 khoảng 0,17. Encoder được
     chọn: SigLIP. Bảng thí nghiệm có thêm cột giải mã chốt; `summary.json` ghi các lần chạy
     tiếp và ghi đè cấu hình.
-  - Bước 4 chưa làm.
+  - **Bước 4 xong** – decoder `transformer` (3 lớp, `d_model` 512). Một seed trên SigLIP, CLIP
+    và ResNet-50: kém LSTM attention cùng encoder vì overfit sớm; bản dropout 0,3 trên SigLIP
+    đạt 0,6437, vẫn kém và BLEU-4 thấp hơn 2,4 điểm. Cặp đề xuất: LSTM attention + SigLIP.
+    Danh sách 10 cấu hình cho Bước 5 trong `configs/sweeps/` (chưa chạy).
 - **Quy tắc đánh giá:** chọn mô hình và tinh chỉnh chỉ dựa trên val; tập test chỉ dùng một lần
   để báo cáo mô hình cuối cùng.
 
@@ -177,9 +180,9 @@ Làm theo đúng thứ tự trong mục "Giai đoạn 5–6" của [ROADMAP.md](
 1. ~~Bước 1 – Hạ tầng so sánh~~ (xong).
 2. ~~Bước 2 – LSTM có attention và kiểm tra beam search~~ (xong).
 3. ~~Bước 3 – Encoder mạnh hơn~~ (xong, chọn SigLIP).
-4. **Bước 4 – Transformer decoder** trên SigLIP và CLIP (hai encoder sát nhau), kèm đối chứng
-   ResNet-50; rồi chuẩn bị (không chạy) danh sách cấu hình cho Bước 5.
-5. **Dừng và báo cáo** theo bốn mục nêu trong ROADMAP. Bước 5–7 chờ chủ dự án duyệt.
+4. ~~Bước 4 – Transformer decoder~~ (xong; danh sách cấu hình Bước 5 đã chuẩn bị).
+5. **Dừng và báo cáo** theo bốn mục nêu trong ROADMAP. Bước 5–7 chờ chủ dự án duyệt; trước
+   Bước 5 làm hai việc trong mục "Việc phải làm trước Bước 5" của ROADMAP.
 
 Sau mỗi bước: commit, mở Pull Request, cập nhật `docs/EXPERIMENTS.md`, `docs/ROADMAP.md` và hai
 mục "Trạng thái hiện tại", "Việc kế tiếp" của file này, rồi tự merge khi `pytest` và `ruff` qua.
@@ -196,7 +199,7 @@ Các thư mục sau đã được tạo (không nằm trong git), không cần c
 - `outputs/baseline_lstm_seed43/`, `outputs/baseline_lstm_seed44/`: baseline với seed khác, dùng
   để đo độ nhiễu. `outputs/attention_lstm*/`: ba seed của decoder attention (Bước 2), kèm
   `decoding_study*.json`. `outputs/{attention,lstm}_{clip,siglip}_b16*/`: các run Bước 3 (ba
-  seed cho attention, một seed cho LSTM).
+  seed cho attention, một seed cho LSTM). `outputs/transformer*/`: các run Bước 4.
 - `data/features/uit_openviic/clip_vit_b16_224/`, `.../siglip_b16_224/`: cache đặc trưng CLIP và
   SigLIP (lưới 196 × 768, mỗi cache 3,67 GB), trích bằng code của nhánh `feat/strong-encoders`.
   Trọng số tải về nằm trong cache Hugging Face của người dùng, ngoài repo.

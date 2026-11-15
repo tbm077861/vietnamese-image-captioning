@@ -11,12 +11,13 @@ Trạng thái: ✅ xong · 🔄 đang làm · ⬜ chưa làm
 | 2 | Khảo sát và chọn dataset | ✅ |
 | 3 | Tiền xử lý tiếng Việt và pipeline dữ liệu | ✅ |
 | 4 | Mô hình baseline, huấn luyện, đánh giá, suy luận, kết quả baseline | ✅ |
-| 5 | Mô hình mạnh hơn: bước 1–4 của kế hoạch bên dưới | 🔄 bước 1–3 xong, kế tiếp là bước 4 |
+| 5 | Mô hình mạnh hơn: bước 1–4 của kế hoạch bên dưới | ✅ bước 1–4 xong, chờ duyệt bước 5–7 |
 | 6 | Tinh chỉnh, tối ưu CIDEr, hướng tùy chọn: bước 5–7 | ⬜ |
 | 7 | Đánh giá tổng hợp và phân tích lỗi | ⬜ |
 | 8 | Demo Gradio và hoàn thiện README | ⬜ |
 
-**Việc kế tiếp: Bước 4 của Giai đoạn 5** (Transformer decoder). Bảng so sánh mọi run:
+**Việc kế tiếp:** chủ dự án đọc báo cáo sau Bước 4 và duyệt Bước 5–7; trước Bước 5 làm hai việc
+trong mục "Việc phải làm trước Bước 5". Bảng so sánh mọi run:
 [EXPERIMENTS.md](EXPERIMENTS.md).
 
 **Quy tắc đánh giá:** mọi lựa chọn mô hình, siêu tham số và cách giải mã chỉ dựa trên tập val.
@@ -170,7 +171,15 @@ mã chốt cho mọi run (`src/vic/engine/protocol.py`). Chi tiết, RAM từng 
   CLIP, SigLIP), chọn encoder theo CIDEr val (beam 3).
 - Việc trích cache có thể chạy nền trong lúc viết code Bước 2.
 
-### Bước 4 – Transformer decoder ⬜ (nhánh `feat/transformer-decoder`)
+### Bước 4 – Transformer decoder ✅ (nhánh `feat/transformer-decoder`)
+
+**Kết quả:** `DECODERS["transformer"]` chạy trên SigLIP, CLIP (hai encoder sát nhau ở Bước 3)
+và ResNet-50 (đối chứng), một seed. Với cấu hình khởi điểm, Transformer kém LSTM attention cùng
+encoder 0,028–0,041 CIDEr vì overfit sớm (epoch tốt nhất 6–8). Thêm một run dropout 0,3 trên
+SigLIP (trong khoảng 0,1–0,3 của kế hoạch): CIDEr 0,6437, vẫn kém LSTM attention + SigLIP
+(0,6570 ± 0,0058) và BLEU-4 thấp hơn 2,4 điểm. **Cặp đề xuất: LSTM attention + SigLIP
+ViT-B/16.** Danh sách cấu hình cho Bước 5 nằm trong `configs/sweeps/` (chưa chạy). Chi tiết:
+[EXPERIMENTS.md](EXPERIMENTS.md).
 
 - Lớp `TransformerCaptionDecoder`, đăng ký `DECODERS["transformer"]`: chiếu đặc trưng xuống
   `d_model` (512), cộng embedding vị trí học được cho các vùng; `nn.TransformerDecoder` 3 lớp, 8
@@ -214,6 +223,33 @@ Trên cặp encoder – decoder tốt nhất, tối đa 15 run, mỗi run đổi
 0,1), dropout, learning rate, số lớp và độ rộng, mức từ hay âm tiết, `text.min_freq` (đổi thì phải
 chạy lại `prepare_data.py`), và cách giải mã (beam, length penalty, chặn lặp). Chủ dự án tự chạy
 bằng `scripts/run_sweep.py` với danh sách đã chuẩn bị ở cuối Bước 4.
+
+**Danh sách đã chuẩn bị** (`configs/sweeps/`, gốc là `attention_siglip_b16`, CIDEr val
+0,6570 ± 0,0058): 10 run seed 42, mỗi run đổi một yếu tố so với gốc.
+
+| # | Run | Yếu tố đổi (gốc → mới) |
+|---:|---|---|
+| 1 | `attention_siglip_b16_ls01` | `train.label_smoothing` 0 → 0,1 |
+| 2 | `attention_siglip_b16_dropout03` | `model.decoder.dropout` 0,5 → 0,3 |
+| 3 | `attention_siglip_b16_lr5e-4` | `train.lr` 1e-3 → 5e-4 |
+| 4 | `attention_siglip_b16_lr2e-3` | `train.lr` 1e-3 → 2e-3 |
+| 5 | `attention_siglip_b16_hidden1024` | `model.decoder.hidden_dim` 512 → 1024 |
+| 6 | `attention_siglip_b16_wd001` | `train.weight_decay` 0 → 0,01 (AdamW) |
+| 7 | `attention_siglip_b16_batch64` | `train.batch_size` 128 → 64 |
+| 8 | `attention_siglip_b16_patience10` | `train.early_stopping_patience` 5 → 10 |
+| 9 | `attention_siglip_b16_syllable` | `text.level` word → syllable |
+| 10 | `attention_siglip_b16_minfreq5` | `text.min_freq` 3 → 5 |
+
+- Decoder LSTM attention chỉ có một lớp nên không có run đổi số lớp; độ rộng thử ở run 5.
+- Cách giải mã không cần huấn luyện lại: đo trên checkpoint tốt nhất bằng
+  `scripts/study_decoding.py`, không tính vào 15 run.
+- Run 9 và 10 cần chuẩn bị dữ liệu một lần trước (lệnh ghi ở đầu mỗi file cấu hình):
+  `python -I scripts/prepare_data.py --config configs/sweeps/09_attention_siglip_b16_syllable.yaml`
+  và tương tự với file `10_...`. Thiếu bước này thì run đó báo lỗi, các run khác vẫn chạy.
+- Lệnh chạy cả danh sách: `python -I -X utf8 scripts/run_sweep.py configs/sweeps`. Ngân sách 15
+  run còn 5: bốn run dành cho seed 43 và 44 của hai cấu hình tốt nhất (chạy lại riêng hai file
+  đó với `--seeds 42 43 44`; seed 42 đã xong sẽ được bỏ qua).
+- Một chênh lệch chỉ được coi là thật khi vượt hai lần độ lệch chuẩn và vượt 0,01 CIDEr.
 
 ### Bước 6 – Tối ưu CIDEr kiểu SCST ⬜ (chưa được duyệt chạy)
 

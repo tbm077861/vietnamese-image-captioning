@@ -1,0 +1,10 @@
+# Step 5 sweep, run 02: attention_siglip_b16 with decoder dropout 0.3 (base: 0.5).
+# One factor changed; everything else is inherited.
+
+base_config: configs/attention_siglip_b16.yaml
+run_name: attention_siglip_b16_dropout03
+notes: "Bước 5: dropout 0,3"
+
+model:
+  decoder:
+    dropout: 0.3

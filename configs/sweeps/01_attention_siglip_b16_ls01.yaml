@@ -1,0 +1,9 @@
+# Step 5 sweep, run 01: attention_siglip_b16 with label smoothing 0.1 (base: 0.0).
+# One factor changed; everything else is inherited.
+
+base_config: configs/attention_siglip_b16.yaml
+run_name: attention_siglip_b16_ls01
+notes: "Bước 5: label smoothing 0,1"
+
+train:
+  label_smoothing: 0.1

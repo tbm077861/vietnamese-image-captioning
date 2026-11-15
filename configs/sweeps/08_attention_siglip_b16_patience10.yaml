@@ -1,0 +1,9 @@
+# Step 5 sweep, run 08: attention_siglip_b16 with early-stopping patience 10 evaluations (base: 5).
+# One factor changed; everything else is inherited.
+
+base_config: configs/attention_siglip_b16.yaml
+run_name: attention_siglip_b16_patience10
+notes: "Bước 5: kiên nhẫn dừng sớm 10"
+
+train:
+  early_stopping_patience: 10

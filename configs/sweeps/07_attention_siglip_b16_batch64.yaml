@@ -1,0 +1,9 @@
+# Step 5 sweep, run 07: attention_siglip_b16 with batch size 64 (base: 128), same learning rate.
+# One factor changed; everything else is inherited.
+
+base_config: configs/attention_siglip_b16.yaml
+run_name: attention_siglip_b16_batch64
+notes: "Bước 5: batch 64"
+
+train:
+  batch_size: 64

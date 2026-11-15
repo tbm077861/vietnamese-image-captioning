@@ -15,6 +15,10 @@ DECODER_CONFIGS = {
         "type": "lstm_attention", "embed_dim": 16, "hidden_dim": 24, "attention_dim": 20,
         "dropout": 0.0,
     },
+    "transformer": {
+        "type": "transformer", "d_model": 32, "num_layers": 2, "num_heads": 4, "ff_dim": 64,
+        "dropout": 0.0,
+    },
 }  # fmt: skip
 VOCAB_SIZE, PAD, BOS, EOS = 12, 0, 1, 2
 
@@ -212,3 +216,18 @@ def test_feature_norm_makes_decoders_insensitive_to_feature_scale(decoder_type):
     logits = model(input_ids, features=features)
     assert logits.shape == (2, 4, VOCAB_SIZE)
     assert torch.allclose(logits, model(input_ids, features=features * 50), atol=1e-3)
+
+
+def test_transformer_ignores_padding_and_future_tokens():
+    model = _decoder_only("transformer")
+    features = torch.randn(2, 4, 2048)
+    input_ids = torch.tensor([[BOS, 5, 6, 7, 8], [BOS, 5, 6, PAD, PAD]])
+    logits = model(input_ids, features=features)
+    changed = input_ids.clone()
+    changed[0, 3:] = torch.tensor([9, 10])  # the future of position 2
+    assert torch.allclose(logits[0, :3], model(changed, features=features)[0, :3], atol=1e-5)
+    # The padded row gives the same logits as the unpadded caption.
+    unpadded = model(input_ids[1:, :3], features=features[1:])[0]
+    assert torch.allclose(logits[1, :3], unpadded, atol=1e-5)
+    with pytest.raises(ValueError, match="max_positions"):
+        model(torch.full((1, 65), 5), features=features[:1])

@@ -1,0 +1,10 @@
+# Step 5 sweep, run 09: attention_siglip_b16 with syllable-level tokens (base: word level). Needs, once:
+#   python -I scripts/prepare_data.py --config configs/sweeps/09_attention_siglip_b16_syllable.yaml
+# One factor changed; everything else is inherited.
+
+base_config: configs/attention_siglip_b16.yaml
+run_name: attention_siglip_b16_syllable
+notes: "Bước 5: mức âm tiết"
+
+text:
+  level: syllable

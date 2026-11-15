@@ -1,0 +1,64 @@
+# Transformer decoder (3 pre-norm layers, cross-attention to the region grid) on the 7 x 7
+# ResNet-50 grid: the control run for the ViT encoders. Same data, text settings, epochs and
+# early stopping as attention_lstm.yaml; the decoder and its usual optimisation settings differ
+# (smaller learning rate with a longer warm-up, label smoothing, smaller batches).
+
+seed: 42
+run_name: transformer
+output_dir: outputs
+data_root: data
+device: auto
+notes: Transformer 3 lớp trên lưới 7x7
+
+dataset_config: configs/datasets/uit_openviic.yaml
+
+text:
+  level: word
+  lowercase: true
+  strip_punctuation: true
+  min_freq: 3
+  max_vocab_size: null
+  max_length: 30
+
+data:
+  use_cached_features: true
+  features_in_memory: true
+
+model:
+  encoder:
+    name: resnet50
+    image_size: 224
+    trainable: false
+  decoder:
+    type: transformer
+    d_model: 512
+    num_layers: 3
+    num_heads: 8
+    ff_dim: 2048
+    dropout: 0.1
+    feature_norm: false
+
+train:
+  epochs: 30
+  batch_size: 64
+  lr: 2.0e-4
+  encoder_lr: 1.0e-5
+  weight_decay: 0.0
+  grad_clip: 5.0
+  label_smoothing: 0.1
+  scheduler: cosine
+  warmup_steps: 1500
+  amp: true
+  num_workers: 0
+  log_every: 50
+  save_every_steps: 200
+  eval_every_epochs: 1
+  monitor: CIDEr
+  early_stopping_patience: 5
+  tensorboard: true
+  deterministic: false
+
+eval:
+  beam_size: 3
+  length_penalty: 0.7
+  batch_size: 128
