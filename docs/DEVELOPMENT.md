@@ -91,6 +91,8 @@ python scripts/prepare_data.py --config configs/baseline_lstm.yaml
 
 # Cache đặc trưng ảnh (một lần cho mỗi encoder / kích thước ảnh)
 python scripts/extract_features.py --config configs/baseline_lstm.yaml
+python scripts/extract_features.py --config configs/lstm_clip_b16.yaml     # CLIP ViT-B/16, 3,67 GB
+python scripts/extract_features.py --config configs/lstm_siglip_b16.yaml   # SigLIP ViT-B/16, 3,67 GB
 
 # Huấn luyện, tiếp tục khi bị ngắt, chạy thử nhanh
 python scripts/train.py --config configs/baseline_lstm.yaml
@@ -131,10 +133,12 @@ Trên Windows, khi in tiếng Việt ra console bị lỗi mã hóa thì thêm `
 - Đường dẫn dữ liệu và kết quả nằm dưới `data/` và `outputs/` (đều bị git bỏ qua).
 - Mỗi module có test tương ứng trong `tests/`.
 - Decoder mới hiện thực giao diện chung (`forward`, `init_state`, `step`, `reorder_state`) và
-  đăng ký vào `DECODERS`; dataset mới thêm YAML trong `configs/datasets/` và, nếu cần, một
+  đăng ký vào `DECODERS`; encoder mới đăng ký vào `ENCODERS` (ghi giấy phép vào
+  `docs/MODELS.md` trước khi tải trọng số); dataset mới thêm YAML trong `configs/datasets/` và, nếu cần, một
   adapter trong `src/vic/data/sources.py`.
 - Mỗi thí nghiệm có một file YAML riêng trong `configs/` và một `run_name` riêng; không sửa
-  file cấu hình của thí nghiệm đã chạy.
+  file cấu hình của thí nghiệm đã chạy. Thí nghiệm mới nên kế thừa bằng `base_config:` và chỉ
+  ghi phần khác.
 - Các Pull Request của nhiều giai đoạn xếp chồng lên nhau: merge theo đúng thứ tự, dùng
   "Create a merge commit" (không squash).
 
@@ -157,8 +161,12 @@ Trên Windows, khi in tiếng Việt ra console bị lỗi mã hóa thì thêm `
   - **Bước 2 xong** – decoder `lstm_attention` (CIDEr val 0,4860 ± 0,0024, vượt baseline ngoài
     mức nhiễu), tùy chọn giải mã `eval.no_repeat_ngram_size` và `eval.beam_stop`,
     `study_decoding.py`. Cách giải mã của mô hình cuối: beam 3, LP 0,7, chặn lặp 3-gram.
-  - Bước 3–4 chưa merge. Nhánh `feat/strong-encoders` đã có một commit code encoder CLIP /
-    SigLIP (chưa có tài liệu, chưa huấn luyện); cache đặc trưng của hai encoder đã trích xong.
+  - **Bước 3 xong** – encoder `clip_vit_b16` và `siglip_b16` (lưới 196 × 768, giấy phép trong
+    [MODELS.md](MODELS.md)). LSTM attention trên SigLIP: CIDEr val 0,6570 ± 0,0058, trên CLIP
+    0,6512 ± 0,0046 (ngang nhau trong mức nhiễu), đều hơn ResNet-50 khoảng 0,17. Encoder được
+    chọn: SigLIP. Bảng thí nghiệm có thêm cột giải mã chốt; `summary.json` ghi các lần chạy
+    tiếp và ghi đè cấu hình.
+  - Bước 4 chưa làm.
 - **Quy tắc đánh giá:** chọn mô hình và tinh chỉnh chỉ dựa trên val; tập test chỉ dùng một lần
   để báo cáo mô hình cuối cùng.
 
@@ -168,9 +176,9 @@ Làm theo đúng thứ tự trong mục "Giai đoạn 5–6" của [ROADMAP.md](
 
 1. ~~Bước 1 – Hạ tầng so sánh~~ (xong).
 2. ~~Bước 2 – LSTM có attention và kiểm tra beam search~~ (xong).
-3. **Bước 3 – Encoder mạnh hơn:** đúng hai ứng viên (một CLIP, một SigLIP), lưu lưới patch; xác
-   minh giấy phép trọng số tại nguồn trước khi tải, ghi vào `docs/MODELS.md`.
-4. **Bước 4 – Transformer decoder**, rồi chuẩn bị (không chạy) danh sách cấu hình cho Bước 5.
+3. ~~Bước 3 – Encoder mạnh hơn~~ (xong, chọn SigLIP).
+4. **Bước 4 – Transformer decoder** trên SigLIP và CLIP (hai encoder sát nhau), kèm đối chứng
+   ResNet-50; rồi chuẩn bị (không chạy) danh sách cấu hình cho Bước 5.
 5. **Dừng và báo cáo** theo bốn mục nêu trong ROADMAP. Bước 5–7 chờ chủ dự án duyệt.
 
 Sau mỗi bước: commit, mở Pull Request, cập nhật `docs/EXPERIMENTS.md`, `docs/ROADMAP.md` và hai
@@ -187,14 +195,20 @@ Các thư mục sau đã được tạo (không nằm trong git), không cần c
   Không xóa: đây là mốc so sánh.
 - `outputs/baseline_lstm_seed43/`, `outputs/baseline_lstm_seed44/`: baseline với seed khác, dùng
   để đo độ nhiễu. `outputs/attention_lstm*/`: ba seed của decoder attention (Bước 2), kèm
-  `decoding_study*.json`.
+  `decoding_study*.json`. `outputs/{attention,lstm}_{clip,siglip}_b16*/`: các run Bước 3 (ba
+  seed cho attention, một seed cho LSTM).
 - `data/features/uit_openviic/clip_vit_b16_224/`, `.../siglip_b16_224/`: cache đặc trưng CLIP và
   SigLIP (lưới 196 × 768, mỗi cache 3,67 GB), trích bằng code của nhánh `feat/strong-encoders`.
-  Trọng số tải về nằm trong cache Hugging Face của người dùng, ngoài repo. Bảng `docs/EXPERIMENTS.md` được sinh từ các thư mục trong `outputs/`, nên xóa
-  một thư mục run là mất dòng tương ứng ở lần sinh bảng sau.
+  Trọng số tải về nằm trong cache Hugging Face của người dùng, ngoài repo.
+
+Bảng `docs/EXPERIMENTS.md` được sinh từ các thư mục trong `outputs/`, nên xóa một thư mục run
+là mất dòng tương ứng ở lần sinh bảng sau.
 
 ### Việc còn dở
 
+- Trước Bước 5: tách tiến trình cho mỗi run trong `run_sweep.py` (hiện dùng chung một tiến
+  trình) và cho encoder ViT chạy float32 (xem "Việc phải làm trước Bước 5" trong
+  [ROADMAP.md](ROADMAP.md)).
 - Dừng sớm với ngưỡng 5 epoch có thể dừng trước khi hội tụ (seed 44 của baseline dừng ở epoch
   19); cân nhắc nới ngưỡng ở lượt tinh chỉnh (Bước 5).
 - Chưa có CI; chạy `pytest` và `ruff check .` trước mỗi lần mở Pull Request. Nên chạy test trên

@@ -1,0 +1,16 @@
+# LSTM baseline decoder on frozen CLIP ViT-B/16 patch features (14 x 14 grid, 768-d).
+# Everything else is inherited from the base file; only the encoder differs.
+
+base_config: configs/baseline_lstm.yaml
+run_name: lstm_clip_b16
+notes: đặc trưng CLIP ViT-B/16, lưới 14x14
+
+data:
+  features_in_memory: false  # memory-map the 3.67 GB cache; loading it into RAM nearly exhausted the RAM of the dev machine
+
+model:
+  encoder:
+    name: clip_vit_b16
+    image_size: 224
+  decoder:
+    feature_norm: true        # LayerNorm on the incoming features (ViT features are unscaled)

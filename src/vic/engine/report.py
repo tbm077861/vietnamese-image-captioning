@@ -13,6 +13,7 @@ from collections import Counter
 from pathlib import Path
 
 from vic.config import data_paths, load_yaml
+from vic.engine.protocol import decoding_label, is_protocol_decoding
 from vic.metrics import caption_statistics, cider_d
 from vic.utils import read_json
 
@@ -65,6 +66,8 @@ def score_table(evaluations: list[dict]) -> list[str]:
     ]
     for item in evaluations:
         decoding = "greedy" if item["beam_size"] <= 1 else f"beam {item['beam_size']}"
+        if not is_protocol_decoding(item.get("decoding")):
+            decoding = decoding_label(item["decoding"])
         cells = [_number(item["scores"][name], name != "CIDEr") for name in SCORE_COLUMNS]
         lines.append(f"| {item['split']} | {decoding} | " + " | ".join(cells) + " |")
     return lines
@@ -141,7 +144,11 @@ def build_report(
     references = {r["image_id"]: [c["normalized"] for c in r["captions"]] for r in images}
     raw = {r["image_id"]: [c["raw"] for c in r["captions"]] for r in images}
     evaluations = load_evaluations(run_dir)
-    by_key = {(item["split"], item["beam_size"]): item for item in evaluations}
+    by_key = {  # analyses and examples use the comparison decoding
+        (item["split"], item["beam_size"]): item
+        for item in evaluations
+        if is_protocol_decoding(item.get("decoding"))
+    }
 
     lines = [f"# Kết quả: {config['run_name']}", "", "## Đường cong học", ""]
     lines += learning_curve(run_dir)

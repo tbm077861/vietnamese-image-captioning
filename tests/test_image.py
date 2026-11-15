@@ -45,3 +45,19 @@ def test_non_rgb_and_truncated_files_load(tmp_path):
     records = [make_record("p", "palette.png", "train", ["x"])]
     store = ImageStore(tmp_path, records, image_size=16)
     assert store["p"].shape == (3, 16, 16)
+
+
+def test_preprocess_image_uses_the_encoder_normalization():
+    import pytest
+
+    from vic.data.image import NORMALIZATION
+
+    grey = Image.new("RGB", (8, 8), (128, 128, 128))
+    value = 128 / 255
+    for name, (mean, std) in NORMALIZATION.items():
+        tensor = preprocess_image(grey, 16, name)
+        expected = torch.tensor([(value - m) / s for m, s in zip(mean, std, strict=True)])
+        assert torch.allclose(tensor[:, 0, 0], expected, atol=1e-5), name
+    assert torch.equal(preprocess_image(grey, 16), preprocess_image(grey, 16, "imagenet"))
+    with pytest.raises(ValueError, match="normalization"):
+        preprocess_image(grey, 16, "unknown")

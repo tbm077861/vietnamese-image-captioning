@@ -15,6 +15,7 @@ from torch.utils.data import DataLoader
 from vic.config import apply_overrides
 from vic.engine.checkpoint import load_checkpoint, model_from_checkpoint
 from vic.engine.data import load_experiment_data, make_image_loader
+from vic.engine.protocol import evaluation_filename
 from vic.metrics import caption_statistics, compute_metrics
 from vic.models import Captioner, beam_search, greedy_decode
 from vic.text.tokenizer import detokenize, to_syllables
@@ -113,21 +114,27 @@ def evaluate_checkpoint(
     output: str | Path | None = None,
     overrides: list[str] | None = None,
     final: bool = False,
+    decoding: dict | None = None,
 ) -> dict:
     """Caption every image of ``split`` with a checkpoint, score the captions, save the result.
 
     The result (scores, naturalness diagnostics and all generated captions) is written to
-    ``output``, by default ``<run>/eval_<split>_beam<k>.json`` next to the checkpoint directory,
-    and returned. The test split is locked: it is refused unless ``final`` is set, because every
-    model, hyper-parameter and decoding choice must be made on the validation split.
+    ``output``, by default ``<run>/<evaluation_filename(split, decoding)>`` next to the
+    checkpoint directory, and returned. ``decoding`` overrides the ``eval`` settings of the
+    checkpoint config (see ``decoding_settings``); ``beam_size`` overrides both. The test split
+    is locked: it is refused unless ``final`` is set, because every model, hyper-parameter and
+    decoding choice must be made on the validation split.
     """
     if split == "test" and not final:
         raise PermissionError(TEST_LOCK_MESSAGE)
     checkpoint = load_checkpoint(checkpoint_path)
     config = apply_overrides(checkpoint["config"], overrides)
     eval_config = config.get("eval", {})
-    if beam_size is None:
-        beam_size = int(eval_config.get("beam_size", 3))
+    requested = dict(decoding or {})
+    if beam_size is not None:
+        requested["beam_size"] = beam_size
+    decoding = decoding_settings(eval_config, **requested)
+    beam_size = decoding["beam_size"]
 
     device = get_device(config.get("device", "auto"))
     data = load_experiment_data(config, vocab=Vocabulary(checkpoint["vocab"]))
@@ -136,7 +143,6 @@ def evaluate_checkpoint(
         raise ValueError(f"The dataset has no {split!r} split")
     model, vocab, _ = model_from_checkpoint(checkpoint, not data.use_features, device)
     loader = make_image_loader(data, split, int(eval_config.get("batch_size", 128)))
-    decoding = decoding_settings(eval_config, beam_size=beam_size)
     hypotheses = generate_captions(
         model,
         loader,
@@ -156,7 +162,7 @@ def evaluate_checkpoint(
 
     if output is None:
         run_dir = Path(checkpoint_path).resolve().parent.parent
-        output = run_dir / f"eval_{split}_beam{beam_size}.json"
+        output = run_dir / evaluation_filename(split, decoding)
     result = {
         "checkpoint": str(checkpoint_path),
         "dataset": config["dataset"]["name"],

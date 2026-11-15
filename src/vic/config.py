@@ -57,9 +57,38 @@ def apply_overrides(config: dict, overrides: list[str] | None) -> dict:
     return config
 
 
+def _deep_merge(base: dict, update: dict) -> dict:
+    """Return ``base`` with ``update`` laid over it; nested mappings are merged key by key."""
+    merged = copy.deepcopy(base)
+    for key, value in update.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _deep_merge(merged[key], value)
+        else:
+            merged[key] = copy.deepcopy(value)
+    return merged
+
+
+def load_experiment_yaml(path: str | Path, _seen: tuple[Path, ...] = ()) -> dict:
+    """Load an experiment file, resolving ``base_config`` (a file whose values it inherits).
+
+    A derived file lists only what differs from its base, which keeps "one factor changed"
+    experiments short and explicit. Paths are relative to the working directory.
+    """
+    path = Path(path)
+    if path.resolve() in _seen:
+        raise ValueError(f"Circular base_config chain through {path}")
+    config = load_yaml(path)
+    base_path = config.pop("base_config", None)
+    if base_path is None:
+        return config
+    base = load_experiment_yaml(base_path, (*_seen, path.resolve()))
+    base.pop("notes", None)  # notes describe one experiment and are not inherited
+    return _deep_merge(base, config)
+
+
 def load_config(path: str | Path, overrides: list[str] | None = None) -> dict:
     """Load an experiment config, merge its dataset config and apply ``key=value`` overrides."""
-    config = copy.deepcopy(load_yaml(path))
+    config = copy.deepcopy(load_experiment_yaml(path))
     parsed = _parse_overrides(overrides)
     for key, value in parsed:
         if not key.startswith("dataset."):
@@ -79,12 +108,35 @@ def load_any_config(path: str | Path, overrides: list[str] | None = None) -> dic
 
     The data scripts (download, verify) only need the dataset section, so they take either.
     """
-    config = load_yaml(path)
+    config = load_experiment_yaml(path)
     if "dataset_config" in config or "dataset" in config:
         return load_config(path, overrides)
     for key, value in _parse_overrides(overrides):
         _set_by_path(config, key.removeprefix("dataset."), value)
     return {"dataset": config}
+
+
+def flatten_config(config: dict, prefix: str = "") -> dict[str, Any]:
+    """``{"a": {"b": 1}}`` -> ``{"a.b": 1}``."""
+    flat: dict[str, Any] = {}
+    for key, value in config.items():
+        name = f"{prefix}{key}"
+        if isinstance(value, dict):
+            flat.update(flatten_config(value, f"{name}."))
+        else:
+            flat[name] = value
+    return flat
+
+
+def config_differences(old: dict, new: dict, ignore: tuple[str, ...] = ("overrides",)) -> list[str]:
+    """``"key: old -> new"`` for every setting that differs (top-level ``ignore`` keys skipped)."""
+    before, after = flatten_config(old), flatten_config(new)
+    changes = []
+    for key in sorted(set(before) | set(after)):
+        if key.split(".")[0] in ignore or before.get(key) == after.get(key):
+            continue
+        changes.append(f"{key}: {before.get(key)!r} -> {after.get(key)!r}")
+    return changes
 
 
 @dataclass(frozen=True)

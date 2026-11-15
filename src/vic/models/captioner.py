@@ -6,7 +6,7 @@ import torch
 from torch import nn
 
 from vic.models.decoder import DECODERS
-from vic.models.encoder import BACKBONES, ImageEncoder
+from vic.models.encoder import ImageEncoder, encoder_spec
 
 
 class Captioner(nn.Module):
@@ -46,7 +46,7 @@ def build_model(
     if decoder_type not in DECODERS:
         raise ValueError(f"Unknown decoder {decoder_type!r}; available: {sorted(DECODERS)}")
 
-    feature_dim = BACKBONES[encoder_config["name"]][2]
+    feature_dim = encoder_spec(encoder_config["name"]).feature_dim
     decoder = DECODERS[decoder_type](
         vocab_size=vocab_size, feature_dim=feature_dim, pad_id=pad_id, **decoder_config
     )
