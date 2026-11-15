@@ -15,6 +15,7 @@ extract_features.py  data/features/<dataset>/<encoder>_<size>/features.npy + ind
 train.py             outputs/<run>/checkpoints/{last,best}.pt, metrics.jsonl, train.log
 evaluate.py          outputs/<run>/eval_<split>_beam<k>.json
 predict.py           caption cho ảnh bất kỳ
+run_sweep.py         train + evaluate (val) cho nhiều cấu hình, cập nhật docs/EXPERIMENTS.md
 ```
 
 Mỗi bước chỉ đọc kết quả của bước trước, nên có thể chạy lại riêng từng bước. Thư mục kết quả
@@ -119,6 +120,13 @@ rate riêng `train.encoder_lr`, và trọng số encoder khi đó được lưu 
 
 - **Không ghi đè âm thầm:** chạy mới vào thư mục đã có checkpoint sẽ bị từ chối, trừ khi dùng
   `--resume auto` hoặc `--overwrite`.
+- **Khởi tạo từ checkpoint khác:** `--init-from` (hoặc `train.init_from`) chỉ nạp trọng số mô
+  hình; optimizer, lịch learning rate và tiến độ bắt đầu lại từ đầu. Khác với `--resume`, vốn
+  khôi phục tất cả để chạy tiếp đúng run cũ.
+- **`summary.json` luôn được ghi**, kể cả khi lỗi: `status` (`completed`, `interrupted`,
+  `failed` kèm thông báo lỗi), commit git, seed, số tham số, tổng thời gian huấn luyện (cộng dồn
+  qua các lần resume), epoch tốt nhất, VRAM đỉnh. `run_sweep.py` dựa vào `status` để bỏ qua run
+  đã xong và chạy tiếp run dở.
 
 Ngân sách VRAM: hệ điều hành chiếm khoảng 1,5 GB trong 8 GB. Số đo khi chạy thử: huấn luyện từ
 cache dùng đỉnh 385 MB (batch 128); chạy encoder đóng băng trực tiếp trên ảnh dùng đỉnh 486 MB
@@ -147,6 +155,16 @@ tin xoay EXIF được xoay cho đúng chiều.
   câu tham chiếu là caption đã chuẩn hóa. Nhờ vậy điểm số không phụ thuộc bộ tách từ và so
   sánh được giữa mô hình mức từ với mô hình mức âm tiết.
 - CIDEr báo theo thang gốc 0–10 của bản tham chiếu (nhiều bài báo nhân 100).
+- **Chỉ số canh độ tự nhiên** (`vic.metrics.diversity`) được lưu trong mỗi file đánh giá: số
+  câu khác nhau, số âm tiết khác nhau, độ dài trung bình, tỉ lệ câu có cụm 2 âm tiết và cụm 3
+  âm tiết xuất hiện hơn một lần. Đây không phải điểm chất lượng; chúng dùng để phát hiện mô hình
+  tăng điểm bằng cách sinh câu chung chung hoặc lặp. Người viết cũng lặp cụm 2 âm tiết một cách
+  hợp lệ ("một người … một người"), nên luôn so với tỉ lệ của câu tham chiếu, không so với 0.
+- **Tập test bị khóa:** `evaluate_checkpoint` từ chối `split="test"` nếu thiếu `final=True`
+  (`--final`). `run_sweep.py` và bảng thí nghiệm chỉ dùng val.
+- **Bảng thí nghiệm:** `docs/EXPERIMENTS.md` được sinh từ `outputs/*/` (xem
+  `vic.engine.experiments`); run tên `<tên>_seed<N>` được gộp với `<tên>` để tính trung bình ±
+  độ lệch chuẩn giữa các seed.
 
 ## 10. Tái lập
 

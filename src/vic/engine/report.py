@@ -13,7 +13,7 @@ from collections import Counter
 from pathlib import Path
 
 from vic.config import data_paths, load_yaml
-from vic.metrics import cider_d
+from vic.metrics import caption_statistics, cider_d
 from vic.utils import read_json
 
 SCORE_COLUMNS = ("BLEU-1", "BLEU-2", "BLEU-3", "BLEU-4", "METEOR", "CIDEr")
@@ -73,24 +73,21 @@ def score_table(evaluations: list[dict]) -> list[str]:
 def diagnostics(evaluation: dict, references: dict[str, list[str]]) -> list[str]:
     """Length, diversity and repetition statistics of the generated captions."""
     predictions = evaluation["predictions"]
-    hypotheses = [caption.split() for caption in predictions.values()]
-    reference_tokens = [ref.split() for key in predictions for ref in references[key]]
-    generated_words = {word for tokens in hypotheses for word in tokens}
-    reference_words = {word for tokens in reference_tokens for word in tokens}
-    repeated = sum(
-        any(a == b for a, b in zip(tokens, tokens[1:], strict=False)) for tokens in hypotheses
-    )
-    repeated_share = 100 * repeated / len(hypotheses)
+    generated = caption_statistics(caption.split() for caption in predictions.values())
+    human = caption_statistics(ref.split() for key in predictions for ref in references[key])
     most_common = Counter(predictions.values()).most_common(3)
     lines = [
-        f"- Số ảnh: {len(hypotheses)}.",
-        f"- Độ dài trung bình (âm tiết): câu sinh ra "
-        f"{statistics.fmean(len(t) for t in hypotheses):.1f}, câu tham chiếu "
-        f"{statistics.fmean(len(t) for t in reference_tokens):.1f}.",
-        f"- Số câu sinh ra khác nhau: {len(set(predictions.values()))} trên {len(hypotheses)}.",
-        f"- Số âm tiết khác nhau được dùng: {len(generated_words)}, trong khi câu tham chiếu "
-        f"dùng {len(reference_words)}.",
-        f"- Câu có một âm tiết lặp liền nhau: {repeated} ({repeated_share:.1f}%).",
+        f"- Số ảnh: {generated['num_captions']}.",
+        f"- Độ dài trung bình (âm tiết): câu sinh ra {generated['mean_length']:.1f}, câu tham "
+        f"chiếu {human['mean_length']:.1f}.",
+        f"- Số câu sinh ra khác nhau: {generated['distinct_captions']} trên "
+        f"{generated['num_captions']}.",
+        f"- Số âm tiết khác nhau được dùng: {generated['distinct_tokens']}, trong khi câu tham "
+        f"chiếu dùng {human['distinct_tokens']}.",
+        f"- Câu có cụm 2 âm tiết lặp lại: {100 * generated['repeated_bigram_rate']:.1f}% "
+        f"(câu tham chiếu: {100 * human['repeated_bigram_rate']:.1f}%).",
+        f"- Câu có cụm 3 âm tiết lặp lại: {100 * generated['repeated_trigram_rate']:.1f}% "
+        f"(câu tham chiếu: {100 * human['repeated_trigram_rate']:.1f}%).",
         "- Ba câu xuất hiện nhiều nhất:",
     ]
     lines += [f'  - {count} lần: "{caption}"' for caption, count in most_common]
@@ -173,3 +170,43 @@ def build_report(
             lines += example_block(image_id, sampled, raw, scores[image_id], max_references)
 
     return "\n".join(lines) + "\n"
+
+
+def build_comparison(
+    run_dirs: list[str | Path],
+    split: str = "val",
+    beam_size: int = 3,
+    samples: int = 50,
+    seed: int = 42,
+    max_references: int = 1,
+) -> str:
+    """Captions of several runs for the same fixed sample of images, side by side.
+
+    The sample depends only on ``seed`` and the split, so every comparison shows the same
+    images. Meant for reading by eye (is a higher-scoring model still natural?).
+    """
+    run_dirs = [Path(run_dir) for run_dir in run_dirs]
+    config = load_yaml(run_dirs[0] / "config.yaml")
+    images = read_json(data_paths(config).captions)["images"]
+    raw = {r["image_id"]: [c["raw"] for c in r["captions"]] for r in images}
+    evaluations = [read_json(run / f"eval_{split}_beam{beam_size}.json") for run in run_dirs]
+    image_ids = sorted(evaluations[0]["predictions"])
+    for run_dir, evaluation in zip(run_dirs, evaluations, strict=True):
+        if sorted(evaluation["predictions"]) != image_ids:
+            raise ValueError(f"{run_dir} was evaluated on a different set of images")
+    chosen = random.Random(seed).sample(image_ids, min(samples, len(image_ids)))
+
+    names = ", ".join(f"`{run.name}`" for run in run_dirs)
+    lines = [
+        f"# So sánh caption: {names}",
+        "",
+        f"{len(chosen)} ảnh {split} cố định (seed {seed}), giải mã beam {beam_size}.",
+        "",
+    ]
+    for image_id in chosen:
+        lines += [f"**Ảnh `{image_id}`**", ""]
+        for run_dir, evaluation in zip(run_dirs, evaluations, strict=True):
+            lines.append(f"- `{run_dir.name}`: *{evaluation['predictions'][image_id]}*")
+        lines += [f"- Tham chiếu: {caption}" for caption in raw[image_id][:max_references]]
+        lines.append("")
+    return "\n".join(lines)

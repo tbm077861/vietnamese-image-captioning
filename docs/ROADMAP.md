@@ -11,12 +11,13 @@ Trạng thái: ✅ xong · 🔄 đang làm · ⬜ chưa làm
 | 2 | Khảo sát và chọn dataset | ✅ |
 | 3 | Tiền xử lý tiếng Việt và pipeline dữ liệu | ✅ |
 | 4 | Mô hình baseline, huấn luyện, đánh giá, suy luận, kết quả baseline | ✅ |
-| 5 | Mô hình mạnh hơn: bước 1–4 của kế hoạch bên dưới | ⬜ kế tiếp |
+| 5 | Mô hình mạnh hơn: bước 1–4 của kế hoạch bên dưới | 🔄 bước 1 xong, kế tiếp là bước 2 |
 | 6 | Tinh chỉnh, tối ưu CIDEr, hướng tùy chọn: bước 5–7 | ⬜ |
 | 7 | Đánh giá tổng hợp và phân tích lỗi | ⬜ |
 | 8 | Demo Gradio và hoàn thiện README | ⬜ |
 
-**Việc kế tiếp: Bước 1 của Giai đoạn 5** (hạ tầng so sánh). Chưa có dòng code nào của Giai đoạn 5.
+**Việc kế tiếp: Bước 2 của Giai đoạn 5** (LSTM có attention và kiểm tra beam search). Bảng so
+sánh mọi run: [EXPERIMENTS.md](EXPERIMENTS.md).
 
 **Quy tắc đánh giá:** mọi lựa chọn mô hình, siêu tham số và cách giải mã chỉ dựa trên tập val.
 Tập test chỉ được dùng thêm một lần, để báo cáo mô hình cuối cùng.
@@ -72,7 +73,14 @@ Mức lợi ích là ước lượng trước khi làm, chưa đo.
 
 DINOv2 đã bị loại khỏi danh sách encoder (không được học cùng ngôn ngữ).
 
-### Bước 1 – Hạ tầng so sánh ⬜ (nhánh `feat/experiment-infra`)
+### Bước 1 – Hạ tầng so sánh ✅ (nhánh `feat/experiment-infra`)
+
+**Kết quả:** cả tám mục dưới đây đã xong. Baseline qua ba seed (42, 43, 44): CIDEr val
+0,4199 ± 0,0164, BLEU-4 28,13 ± 0,80 (beam 3), nên một chênh lệch phải vượt khoảng 0,033 CIDEr
+mới được coi là thật. Dừng sớm với ngưỡng 5 epoch góp phần vào độ nhiễu (seed 44 dừng ở epoch
+19). Chi tiết và bảng: [EXPERIMENTS.md](EXPERIMENTS.md). Ngoài kế hoạch có thêm
+`scripts/compare_runs.py` (caption của nhiều run trên cùng 50 ảnh val cố định, phục vụ kiểm tra
+độ tự nhiên ở Bước 6) và `scripts/update_experiments.py` (sinh lại bảng).
 
 1. **Bảng thí nghiệm `docs/EXPERIMENTS.md`**, sinh tự động từ `outputs/*/` (`summary.json`,
    `eval_val_beam*.json`), chỉ dùng số liệu val. Mỗi run một dòng: encoder, decoder, seed, CIDEr

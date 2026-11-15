@@ -97,12 +97,26 @@ python scripts/train.py --config configs/baseline_lstm.yaml
 python scripts/train.py --config configs/baseline_lstm.yaml --resume auto
 python scripts/train.py --config configs/baseline_lstm.yaml --max-steps 300 run_name=smoke
 
-# Đánh giá và suy luận
+python scripts/train.py --config configs/moi.yaml --init-from outputs/cu/checkpoints/best.pt
+
+# Đánh giá (mặc định trên val; --split test chỉ chạy được khi có --final) và suy luận
 python scripts/evaluate.py --checkpoint outputs/baseline_lstm/checkpoints/best.pt --split val --beam-size 1 3
-python scripts/summarize_run.py --run outputs/baseline_lstm --sample-split val
+python scripts/summarize_run.py --run outputs/baseline_lstm --sample-split val --samples 50
 python scripts/predict.py --checkpoint outputs/baseline_lstm/checkpoints/best.pt --image anh.jpg
 tensorboard --logdir outputs
+
+# Nhiều thí nghiệm: huấn luyện + đánh giá val (greedy, beam 3) + cập nhật bảng; chạy lại là resume
+python scripts/run_sweep.py configs/a.yaml configs/b.yaml
+python scripts/run_sweep.py configs/sweeps/                    # mọi *.yaml trong thư mục
+python scripts/run_sweep.py configs/baseline_lstm.yaml --seeds 42 43 44
+python scripts/update_experiments.py                           # sinh lại bảng docs/EXPERIMENTS.md
+python scripts/compare_runs.py --runs outputs/a outputs/b      # 50 ảnh val cố định, đọc bằng mắt
 ```
+
+`run_sweep.py` bỏ qua run đã xong (`summary.json` có `status: completed`), chạy tiếp run dở từ
+`last.pt`, ghi run lỗi vào bảng rồi đi tiếp; với `--seeds`, seed của file cấu hình giữ nguyên
+`run_name`, seed khác chạy thành `<run_name>_seed<N>`. Thư mục run tên `smoke*`, `debug*`,
+`tmp*` không vào bảng.
 
 Trên Windows, khi in tiếng Việt ra console bị lỗi mã hóa thì thêm `-X utf8` sau `python`.
 
@@ -132,9 +146,12 @@ Trên Windows, khi in tiếng Việt ra console bị lỗi mã hóa thì thêm `
   resume, đánh giá, suy luận.
 - **Đã xong:** huấn luyện đầy đủ baseline và báo cáo kết quả (CIDEr val 0,4274 với beam 3), xem
   [RESULTS.md](RESULTS.md).
-- **Đã duyệt, chưa bắt đầu:** kế hoạch Giai đoạn 5–6 (bảy bước) trong
-  [ROADMAP.md](ROADMAP.md). Chưa có dòng code nào của Giai đoạn 5. `main` sạch, không có Pull
-  Request nào đang mở.
+- **Đang làm:** Giai đoạn 5–6 theo kế hoạch bảy bước đã duyệt trong [ROADMAP.md](ROADMAP.md).
+  - **Bước 1 xong** – hạ tầng so sánh: bảng [EXPERIMENTS.md](EXPERIMENTS.md), chỉ số canh độ tự
+    nhiên, khóa tập test (`--final`), `train.py --init-from`, `run_sweep.py`,
+    `update_experiments.py`, `compare_runs.py`. Độ nhiễu baseline qua ba seed: CIDEr val
+    0,4199 ± 0,0164 (beam 3).
+  - Bước 2–4 chưa bắt đầu.
 - **Quy tắc đánh giá:** chọn mô hình và tinh chỉnh chỉ dựa trên val; tập test chỉ dùng một lần
   để báo cáo mô hình cuối cùng.
 
@@ -142,10 +159,9 @@ Trên Windows, khi in tiếng Việt ra console bị lỗi mã hóa thì thêm `
 
 Làm theo đúng thứ tự trong mục "Giai đoạn 5–6" của [ROADMAP.md](ROADMAP.md):
 
-1. **Bước 1 – Hạ tầng so sánh** (nhánh `feat/experiment-infra`): bảng thí nghiệm
-   `docs/EXPERIMENTS.md`, chỉ số canh độ tự nhiên, khóa tập test bằng cờ `--final`,
-   `train.py --init-from`, `scripts/run_sweep.py`, chạy baseline với seed 43 và 44 để đo độ nhiễu.
-2. **Bước 2 – LSTM có attention**, kèm kiểm tra beam search và length penalty trên val.
+1. ~~Bước 1 – Hạ tầng so sánh~~ (xong).
+2. **Bước 2 – LSTM có attention** (nhánh `feat/attention-decoder`), kèm kiểm tra beam search và
+   length penalty trên val. Cấu hình `configs/attention_lstm.yaml`.
 3. **Bước 3 – Encoder mạnh hơn:** đúng hai ứng viên (một CLIP, một SigLIP), lưu lưới patch; xác
    minh giấy phép trọng số tại nguồn trước khi tải, ghi vào `docs/MODELS.md`.
 4. **Bước 4 – Transformer decoder**, rồi chuẩn bị (không chạy) danh sách cấu hình cho Bước 5.
@@ -163,11 +179,14 @@ Các thư mục sau đã được tạo (không nằm trong git), không cần c
 - `data/features/uit_openviic/resnet50_224/`: cache đặc trưng (2,45 GB);
 - `outputs/baseline_lstm/`: baseline chính thức (checkpoint, log, kết quả đánh giá, `report.md`).
   Không xóa: đây là mốc so sánh.
+- `outputs/baseline_lstm_seed43/`, `outputs/baseline_lstm_seed44/`: baseline với seed khác, dùng
+  để đo độ nhiễu. Bảng `docs/EXPERIMENTS.md` được sinh từ các thư mục trong `outputs/`, nên xóa
+  một thư mục run là mất dòng tương ứng ở lần sinh bảng sau.
 
 ### Việc còn dở
 
-- Kết quả baseline mới có một seed, chưa đo độ dao động giữa các lần chạy (Bước 1).
-- Chưa có `train.py --init-from`, chưa khóa tập test, chưa có bảng thí nghiệm (Bước 1).
+- Dừng sớm với ngưỡng 5 epoch có thể dừng trước khi hội tụ (seed 44 của baseline dừng ở epoch
+  19); cân nhắc nới ngưỡng ở lượt tinh chỉnh (Bước 5).
 - Beam search: beam 5 kém greedy trên cả val và test dù đã có chuẩn hóa độ dài; chưa tìm
   nguyên nhân (Bước 2).
 - Chưa có CI; chạy `pytest` và `ruff check .` trước mỗi lần mở Pull Request. Nên chạy test trên

@@ -70,3 +70,21 @@ def test_meteor_exact_properties():
 def test_compute_metrics_requires_references_for_every_hypothesis():
     with pytest.raises(KeyError):
         compute_metrics({"1": [["a"]]}, {"2": ["a"]})
+
+
+def test_caption_statistics_counts_diversity_and_repeated_ngrams():
+    from vic.metrics import caption_statistics
+
+    captions = [
+        "một tòa nhà có nhiều hơn một tầng có nhiều hơn một tầng".split(),  # repeated 3-gram
+        "một tô phở có thịt và hành và hành".split(),  # repeated 2-gram only
+        "một con mèo đang ngủ".split(),
+        "một con mèo đang ngủ".split(),
+    ]
+    stats = caption_statistics(captions)
+    assert stats["num_captions"] == 4 and stats["distinct_captions"] == 3
+    assert stats["distinct_tokens"] == 16
+    assert stats["mean_length"] == (13 + 9 + 5 + 5) / 4
+    assert stats["repeated_bigram_rate"] == 0.5 and stats["repeated_trigram_rate"] == 0.25
+    # Adjacent identical syllables alone are not a repeated 2-gram.
+    assert caption_statistics(["rất rất đẹp".split()])["repeated_bigram_rate"] == 0.0

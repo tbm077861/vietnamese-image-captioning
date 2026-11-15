@@ -16,7 +16,15 @@ from vic.engine.checkpoint import load_checkpoint, save_checkpoint
 from vic.engine.data import load_experiment_data, make_image_loader, make_pair_loader
 from vic.engine.evaluation import build_references, format_scores, generate_captions, score_captions
 from vic.models import build_model
-from vic.utils import JsonlWriter, close_logging, get_device, set_seed, setup_logging, write_json
+from vic.utils import (
+    JsonlWriter,
+    close_logging,
+    get_device,
+    git_commit,
+    set_seed,
+    setup_logging,
+    write_json,
+)
 
 
 def _make_scheduler(optimizer, kind: str, warmup_steps: int, total_steps: int) -> LambdaLR:
@@ -61,6 +69,7 @@ def run_training(
     resume: str | None = None,
     max_steps: int | None = None,
     overwrite: bool = False,
+    init_from: str | None = None,
 ) -> dict:
     """Train according to ``config`` and return a summary of the run.
 
@@ -68,15 +77,49 @@ def run_training(
     when it exists. ``max_steps`` stops early (smoke tests) without touching the schedule.
     A fresh run refuses to start in a directory that already has checkpoints unless
     ``overwrite`` is set, so a finished training is never lost by accident.
+
+    ``init_from`` (or ``train.init_from`` in the config) is a checkpoint whose model weights
+    start a *new* run: optimiser, schedule and progress start from scratch. It is ignored when
+    the run is being resumed, since the resumed checkpoint already descends from it.
+
+    ``summary.json`` is always written, with ``status`` "completed" (all epochs or early
+    stopping), "interrupted" (``max_steps`` or Ctrl+C) or "failed" (with the error).
     """
-    train_config = config["train"]
+    if init_from is not None:
+        config["train"]["init_from"] = str(init_from)
     run_dir = Path(config.get("output_dir", "outputs")) / config["run_name"]
+    try:
+        return _train(config, run_dir, resume, max_steps, overwrite)
+    except RunExistsError:
+        raise  # nothing was started; the summary of the existing run must stay untouched
+    except BaseException as error:
+        interrupted = isinstance(error, KeyboardInterrupt)
+        summary = {
+            "run_name": config["run_name"],
+            "status": "interrupted" if interrupted else "failed",
+            "error": f"{type(error).__name__}: {error}"[:500],
+            "seed": int(config.get("seed", 42)),
+            "git_commit": git_commit(),
+        }
+        write_json(summary, run_dir / "summary.json", indent=2)
+        raise
+
+
+class RunExistsError(RuntimeError):
+    """A fresh run was asked to start in a directory that already holds checkpoints."""
+
+
+def _train(
+    config: dict, run_dir: Path, resume: str | None, max_steps: int | None, overwrite: bool
+) -> dict:
+    train_config = config["train"]
+    init_from = train_config.get("init_from")
     checkpoint_dir = run_dir / "checkpoints"
     last_path = checkpoint_dir / "last.pt"
     best_path = checkpoint_dir / "best.pt"
     if resume is None and last_path.exists():
         if not overwrite:
-            raise RuntimeError(
+            raise RunExistsError(
                 f"{run_dir} already contains checkpoints. Continue with --resume auto, pick "
                 "another run_name=..., or pass --overwrite to discard the previous run."
             )
@@ -142,8 +185,19 @@ def run_training(
         "batches_done": 0,  # batches already consumed in the current epoch
         "global_step": 0,
         "best_score": None,
+        "best_epoch": None,
         "epochs_without_improvement": 0,
+        "elapsed_seconds": 0.0,  # wall-clock training time, accumulated across resumes
     }
+    if checkpoint is None and init_from:
+        initial = load_checkpoint(init_from)
+        if initial["vocab"] != vocab.to_list():
+            raise RuntimeError("The --init-from checkpoint vocabulary differs from the data")
+        model.decoder.load_state_dict(initial["decoder"])
+        if initial.get("encoder") is not None and model.encoder is not None:
+            model.encoder.load_state_dict(initial["encoder"])
+        logger.info(f"Initialised the model weights from {init_from}")
+        del initial
     if checkpoint is not None:
         model.decoder.load_state_dict(checkpoint["decoder"])
         if checkpoint.get("encoder") is not None and model.encoder is not None:
@@ -154,7 +208,7 @@ def run_training(
         torch.set_rng_state(checkpoint["torch_rng"])
         if checkpoint.get("cuda_rng") is not None and device.type == "cuda":
             torch.cuda.set_rng_state_all(checkpoint["cuda_rng"])
-        progress = dict(checkpoint["progress"])
+        progress = {**progress, **checkpoint["progress"]}
     else:
         save_yaml(config, run_dir / "config.yaml")
 
@@ -178,7 +232,11 @@ def run_training(
         f"{steps_per_epoch} steps/epoch | {epochs} epochs"
     )
 
+    run_start = time.perf_counter()
+    elapsed_before = float(progress["elapsed_seconds"])
+
     def save(path: Path) -> None:
+        progress["elapsed_seconds"] = elapsed_before + time.perf_counter() - run_start
         save_checkpoint(
             path, model=model, config=config, vocab=vocab, progress=progress,
             optimizer=optimizer, scheduler=scheduler, scaler=scaler,
@@ -298,6 +356,7 @@ def run_training(
             improved = best is None or scores[monitor] > best
             if improved:
                 progress["best_score"] = scores[monitor]
+                progress["best_epoch"] = epoch + 1
                 progress["epochs_without_improvement"] = 0
             else:
                 progress["epochs_without_improvement"] += 1
@@ -329,6 +388,13 @@ def run_training(
         epoch_minutes = (ms_per_step * steps_per_epoch / 1000 + (validation_seconds or 0.0)) / 60
     summary = {
         "run_name": config["run_name"],
+        "status": "interrupted" if stop else "completed",
+        "seed": seed,
+        "git_commit": git_commit(),
+        "init_from": init_from,
+        "parameter_count": parameter_count,
+        "train_seconds": elapsed_before + time.perf_counter() - run_start,
+        "best_epoch": progress["best_epoch"],
         "global_step": progress["global_step"],
         "steps_this_run": steps_this_run,
         "epochs_completed": progress["epoch"],
