@@ -94,21 +94,40 @@ python scripts/train.py --config configs/baseline_lstm.yaml --resume auto
   `run_name=...`, hoặc thêm `--overwrite` nếu thật sự muốn chạy lại từ đầu.
 - Theo dõi bằng TensorBoard: `tensorboard --logdir outputs`.
 
-### 3. Đánh giá trên tập test
+### 3. Đánh giá
 
 ```powershell
-python scripts/evaluate.py --checkpoint outputs/baseline_lstm/checkpoints/best.pt --split test
+python scripts/evaluate.py --checkpoint outputs/baseline_lstm/checkpoints/best.pt
 ```
 
-In BLEU-1..4, CIDEr, METEOR và ghi điểm cùng toàn bộ caption sinh ra vào
-`outputs/baseline_lstm/eval_test_beam3.json`. Thêm `--beam-size 1` để giải mã greedy. Có thể
-đánh giá nhiều tập và nhiều độ rộng beam trong một lệnh, rồi tổng hợp thành báo cáo Markdown
+In BLEU-1..4, CIDEr, METEOR trên tập val và ghi điểm, các chỉ số canh độ tự nhiên (số câu khác
+nhau, số âm tiết khác nhau, độ dài trung bình, tỉ lệ câu lặp cụm 2 và 3 âm tiết) cùng toàn bộ
+caption sinh ra vào `outputs/baseline_lstm/eval_val_beam3.json`. Thêm `--beam-size 1` để giải mã
+greedy. Có thể đánh giá nhiều độ rộng beam trong một lệnh, rồi tổng hợp thành báo cáo Markdown
 (đường cong học, bảng điểm, ví dụ ngẫu nhiên theo seed cố định):
 
 ```powershell
-python scripts/evaluate.py --checkpoint outputs/baseline_lstm/checkpoints/best.pt --split val test --beam-size 1 3 5
-python scripts/summarize_run.py --run outputs/baseline_lstm --output outputs/baseline_lstm/report.md
+python scripts/evaluate.py --checkpoint outputs/baseline_lstm/checkpoints/best.pt --split val --beam-size 1 3 5
+python scripts/summarize_run.py --run outputs/baseline_lstm --sample-split val --output outputs/baseline_lstm/report.md
 ```
+
+**Tập test bị khóa.** Mọi lựa chọn mô hình, siêu tham số và cách giải mã chỉ dựa trên val;
+`--split test` bị từ chối nếu thiếu cờ `--final`, và cờ này chỉ dùng một lần cho mô hình cuối:
+
+```powershell
+python scripts/evaluate.py --checkpoint <checkpoint cuối> --split test --final
+```
+
+Chạy nhiều thí nghiệm liên tiếp và so sánh:
+
+```powershell
+python scripts/run_sweep.py configs/a.yaml configs/b.yaml      # huấn luyện + đánh giá val, tự resume
+python scripts/run_sweep.py configs/baseline_lstm.yaml --seeds 42 43 44
+python scripts/update_experiments.py                           # sinh lại bảng docs/EXPERIMENTS.md
+python scripts/compare_runs.py --runs outputs/a outputs/b      # caption của 50 ảnh val cố định
+```
+
+Bảng so sánh mọi run (chỉ số liệu val): [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md).
 
 **BLEU và CIDEr là chỉ số chính.** METEOR ở đây chỉ khớp các từ giống hệt nhau vì tiếng Việt
 không có tài nguyên từ đồng nghĩa mà METEOR cần, nên chỉ để tham khảo. Điểm được tính trên âm

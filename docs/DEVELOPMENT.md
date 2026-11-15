@@ -97,12 +97,26 @@ python scripts/train.py --config configs/baseline_lstm.yaml
 python scripts/train.py --config configs/baseline_lstm.yaml --resume auto
 python scripts/train.py --config configs/baseline_lstm.yaml --max-steps 300 run_name=smoke
 
-# Đánh giá và suy luận
+python scripts/train.py --config configs/moi.yaml --init-from outputs/cu/checkpoints/best.pt
+
+# Đánh giá (mặc định trên val; --split test chỉ chạy được khi có --final) và suy luận
 python scripts/evaluate.py --checkpoint outputs/baseline_lstm/checkpoints/best.pt --split val --beam-size 1 3
-python scripts/summarize_run.py --run outputs/baseline_lstm --sample-split val
+python scripts/summarize_run.py --run outputs/baseline_lstm --sample-split val --samples 50
 python scripts/predict.py --checkpoint outputs/baseline_lstm/checkpoints/best.pt --image anh.jpg
 tensorboard --logdir outputs
+
+# Nhiều thí nghiệm: huấn luyện + đánh giá val (greedy, beam 3) + cập nhật bảng; chạy lại là resume
+python scripts/run_sweep.py configs/a.yaml configs/b.yaml
+python scripts/run_sweep.py configs/sweeps/                    # mọi *.yaml trong thư mục
+python scripts/run_sweep.py configs/baseline_lstm.yaml --seeds 42 43 44
+python scripts/update_experiments.py                           # sinh lại bảng docs/EXPERIMENTS.md
+python scripts/compare_runs.py --runs outputs/a outputs/b      # 50 ảnh val cố định, đọc bằng mắt
 ```
+
+`run_sweep.py` bỏ qua run đã xong (`summary.json` có `status: completed`), chạy tiếp run dở từ
+`last.pt`, ghi run lỗi vào bảng rồi đi tiếp; với `--seeds`, seed của file cấu hình giữ nguyên
+`run_name`, seed khác chạy thành `<run_name>_seed<N>`. Thư mục run tên `smoke*`, `debug*`,
+`tmp*` không vào bảng.
 
 Trên Windows, khi in tiếng Việt ra console bị lỗi mã hóa thì thêm `-X utf8` sau `python`.
 

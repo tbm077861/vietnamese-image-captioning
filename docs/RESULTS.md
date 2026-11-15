@@ -17,9 +17,12 @@ Tài liệu này ghi kết quả chính thức của từng mô hình. Hiện c�
 
 ```powershell
 python scripts/train.py --config configs/baseline_lstm.yaml
-python scripts/evaluate.py --checkpoint outputs/baseline_lstm/checkpoints/best.pt --split val test --beam-size 1 3 5
+python scripts/evaluate.py --checkpoint outputs/baseline_lstm/checkpoints/best.pt --split val test --beam-size 1 3 5 --final
 python scripts/summarize_run.py --run outputs/baseline_lstm --output outputs/baseline_lstm/report.md
 ```
+
+Điểm test của baseline được đo trước khi tập test bị khóa. Từ nay `--split test` đòi cờ
+`--final` và chỉ được chạy thêm một lần, cho mô hình cuối cùng.
 
 Các bảng và 10 ví dụ bên dưới lấy nguyên từ `report.md` do lệnh cuối sinh ra.
 
