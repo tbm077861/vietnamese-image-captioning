@@ -11,6 +11,9 @@ không xuất hiện ở đây. Phần giữa hai dấu mốc bên dưới do `s
 | `baseline_lstm` | resnet50 @224 | lstm | 42 | 0.4274 | 28.74 | 0.4232 | 975 | 357 | 14.3 | 15.8 | 8.8 | 7.77 | ~8.3 | 385 | 28 | — |  |
 | `baseline_lstm_seed43` | resnet50 @224 | lstm | 43 | 0.4312 | 28.43 | 0.4304 | 1036 | 349 | 14.6 | 17.6 | 8.9 | 7.77 | 11.0 | 383 | 20 | `cb97a88` |  |
 | `baseline_lstm_seed44` | resnet50 @224 | lstm | 44 | 0.4010 | 27.22 | 0.4156 | 918 | 310 | 14.5 | 14.8 | 5.8 | 7.77 | 6.6 | 382 | 14 | `cb97a88` |  |
+| `attention_lstm` | resnet50 @224 | lstm_attention | 42 | 0.4887 | 31.51 | 0.4874 | 1496 | 409 | 14.0 | 21.2 | 9.1 | 8.82 | 11.2 | 666 | 11 | `ce2723f` | attention trên lưới 7x7 |
+| `attention_lstm_seed43` | resnet50 @224 | lstm_attention | 43 | 0.4840 | 31.95 | 0.4849 | 1525 | 422 | 13.5 | 14.7 | 6.7 | 8.82 | 15.9 | 667 | 16 | `ce2723f` | attention trên lưới 7x7 |
+| `attention_lstm_seed44` | resnet50 @224 | lstm_attention | 44 | 0.4853 | 31.26 | 0.4846 | 1600 | 421 | 14.0 | 18.4 | 10.7 | 8.82 | 16.6 | 667 | 19 | `ce2723f` | attention trên lưới 7x7 |
 
 Để so sánh, 10002 câu tham chiếu của tập val: 2358 âm tiết khác nhau, độ dài trung bình 18.6, lặp 2-gram 20.0%, lặp 3-gram 6.4%.
 
@@ -21,6 +24,7 @@ Trung bình ± độ lệch chuẩn mẫu của các run cùng cấu hình, ch�
 | Cấu hình | Seed | CIDEr | BLEU-4 |
 |---|---|---:|---:|
 | `baseline_lstm` | 42, 43, 44 | 0.4199 ± 0.0164 | 28.13 ± 0.80 |
+| `attention_lstm` | 42, 43, 44 | 0.4860 ± 0.0024 | 31.58 ± 0.35 |
 
 <!-- experiments:end -->
 
@@ -54,3 +58,78 @@ Trung bình ± độ lệch chuẩn mẫu của các run cùng cấu hình, ch�
 - Chỉ số lặp cụm mới bắt được lỗi mà chỉ số cũ ("âm tiết lặp liền nhau", bằng 0) bỏ sót:
   5,8–8,9% câu của baseline có cụm 3 âm tiết lặp lại, ngang hoặc cao hơn câu tham chiếu (6,4%)
   dù câu sinh ra ngắn hơn nhiều (14,3–14,6 so với 18,6 âm tiết).
+
+### LSTM có attention (Bước 2)
+
+- **Cải thiện thật so với baseline:** CIDEr val 0,4860 ± 0,0024 so với 0,4199 ± 0,0164 (beam
+  3, ba seed). Chênh 0,066, vượt ngưỡng hai lần độ lệch chuẩn (0,033) và vượt 0,01. BLEU-4 31,58
+  ± 0,35 so với 28,13 ± 0,80. Attention cũng ổn định hơn nhiều giữa các seed.
+- **Câu đa dạng hơn:** 1.496–1.600 câu khác nhau trên 2.011 ảnh (baseline 918–1.036), 409–422
+  âm tiết khác nhau (baseline 310–357). Độ dài trung bình gần như không đổi (13,5–14,0 âm tiết),
+  vẫn ngắn hơn câu tham chiếu (18,6). Tỉ lệ câu lặp cụm 3 âm tiết (6,7–10,7%) chưa giảm.
+- **Chi phí:** 8,82 triệu tham số (baseline 7,77), VRAM đỉnh 667 MB, khoảng 95 ms mỗi bước so
+  với 29 ms (decoder lặp từng bước bằng `LSTMCell` thay vì một lần gọi `nn.LSTM`). Thời gian
+  huấn luyện 11–17 phút. Run seed 43 chạy cùng lúc với việc trích cache CLIP / SigLIP nên thời
+  gian của nó bị đội lên; chênh lệch còn lại chủ yếu do số epoch trước khi dừng sớm.
+- **Học nhanh hơn và overfit sớm hơn:** epoch tốt nhất 11, 16, 19 (baseline 14–28); cả ba run
+  dừng sớm trước epoch 25.
+
+### Cách giải mã (Bước 2)
+
+Đo bằng `scripts/study_decoding.py` trên val, checkpoint `best.pt` của từng run. Bảng dưới là
+seed 42; "dừng" là điều kiện dừng của beam search (`first`: như cũ, `best`: giữ đủ beam tới khi
+không câu dở nào còn có thể thắng).
+
+| Mô hình | Giải mã | CIDEr | BLEU-4 | Độ dài TB | Câu khác nhau | Lặp 3-gram (%) |
+|---|---|---:|---:|---:|---:|---:|
+| attention | greedy | 0.4874 | 30.93 | 15.2 | 1626 | 14.3 |
+| attention | beam 3, first, LP 0,7 (mốc so sánh) | 0.4887 | 31.51 | 14.0 | 1496 | 9.1 |
+| attention | beam 3, first, LP 1,0 | 0.4917 | 31.11 | 14.8 | 1539 | 11.8 |
+| attention | beam 3, best, LP 0,7 | 0.4882 | 31.48 | 14.1 | 1498 | 9.4 |
+| attention | beam 3, best, LP 1,3 | 0.3665 | 24.10 | 22.4 | 1746 | 42.4 |
+| attention | beam 5, first, LP 0,7 | 0.4846 | 31.08 | 13.8 | 1388 | 10.4 |
+| attention | beam 3, first, LP 0,7, chặn lặp 3-gram | **0.4994** | **32.02** | 13.9 | 1503 | 0.8 |
+| baseline | greedy | 0.4232 | 28.25 | 15.7 | 1093 | 18.1 |
+| baseline | beam 3, first, LP 0,7 (mốc so sánh) | 0.4274 | 28.74 | 14.3 | 975 | 8.8 |
+| baseline | beam 3, first, LP 1,3 | 0.4353 | 28.21 | 15.7 | 1070 | 14.7 |
+| baseline | beam 3, best, LP 1,3 | 0.3369 | 22.37 | 21.9 | 1257 | 31.9 |
+| baseline | beam 5, first, LP 0,7 | 0.4161 | 28.13 | 14.1 | 882 | 8.7 |
+| baseline | beam 3, first, LP 0,7, chặn lặp 3-gram | 0.4331 | 29.12 | 14.3 | 964 | 0.5 |
+
+Chặn lặp 3-gram trên cả ba seed (beam 3, first, LP 0,7; CIDEr không chặn → có chặn):
+
+| Mô hình | Seed 42 | Seed 43 | Seed 44 | Tăng trung bình |
+|---|---|---|---|---:|
+| attention | 0.4887 → 0.4994 | 0.4840 → 0.4899 | 0.4853 → 0.4962 | +0,0092 |
+| baseline | 0.4274 → 0.4331 | 0.4312 → 0.4391 | 0.4010 → 0.4050 | +0,0059 |
+
+Với greedy, mức tăng là +0,0075 đến +0,0097 ở cả sáu checkpoint. BLEU-4 cũng tăng ở mọi trường
+hợp.
+
+**Vì sao beam rộng kém hơn** (câu hỏi còn mở từ baseline):
+
+- Không phải do điều kiện dừng sớm. Với LP 0 và 0,7, `first` và `best` cho kết quả gần như
+  trùng nhau (chênh dưới 0,002).
+- Khi được tìm kỹ hơn (beam 5, hoặc `best` với LP ≥ 1,0), beam search tìm được những câu mà mô
+  hình gán xác suất cao hơn, nhưng chúng là câu chung chung (beam 5: ít câu khác nhau hơn, ngắn
+  hơn) hoặc vòng lặp dài (`best` với LP 1,3: 22 âm tiết, hơn 40% câu lặp cụm). Đây là hạn chế
+  của mô hình chứ không phải lỗi cài đặt beam search. Điều kiện dừng `first` vô tình đóng vai trò
+  chặn kiểu lỗi này.
+- LP 1,0–1,3 với `first` nhích CIDEr của seed 42 lên 0,003–0,008, nhưng câu dài hơn và lặp
+  nhiều hơn. Mức tăng nhỏ, mới đo trên một seed nên không chọn.
+
+**Chốt cách giải mã (trên val):**
+
+- **Mô hình cuối:** beam 3, `beam_stop: first`, `length_penalty: 0.7`,
+  `no_repeat_ngram_size: 3`. Chặn lặp được chọn vì tăng điểm ở cả sáu checkpoint, đồng thời
+  bỏ được lỗi lặp cụm. Tỉ lệ câu lặp cụm khi đó (0,3–1,1%) thấp hơn câu tham chiếu (6,4%):
+  người viết đôi khi lặp hợp lệ ("một người … một người"), mô hình thì không còn làm vậy.
+- **Bảng so sánh mô hình giữ nguyên giao thức cũ** (beam 3, `first`, LP 0,7, không chặn lặp)
+  để mọi dòng so được với nhau mà không phải đánh giá lại các run cũ. Chặn lặp nâng mọi mô hình
+  lên một mức gần như nhau, nên không đổi thứ hạng. Các cấu hình mới vì vậy không đặt
+  `eval.no_repeat_ngram_size`; cách giải mã của mô hình cuối được áp dụng lúc đánh giá cuối cùng
+  bằng ghi đè `eval.no_repeat_ngram_size=3`.
+- Beam 3 so với greedy khi có chặn lặp: với attention, beam 3 có BLEU-4 cao hơn ở cả ba seed
+  (+0,5 đến +1,2 điểm) và CIDEr ngang nhau (thắng 2 trên 3 seed, chênh dưới 0,004); với baseline
+  thì lẫn lộn (greedy thắng rõ ở seed 44). Greedy luôn cho nhiều câu khác nhau hơn. Giữ beam 3
+  cho các mô hình có attention; xem lại lựa chọn này trên mô hình cuối ở Bước 5.

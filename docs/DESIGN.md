@@ -136,11 +136,26 @@ với batch 16–32 và giảm nếu thiếu bộ nhớ.
 Ảnh có vùng trong suốt (PNG) được đặt lên nền trắng trước khi đưa vào encoder; ảnh có thông
 tin xoay EXIF được xoay cho đúng chiều.
 
+### Decoder LSTM có attention (`lstm_attention`)
+
+Kiểu Show, Attend and Tell: lưới đặc trưng được chiếu xuống `attention_dim` một lần cho mỗi ảnh.
+Ở mỗi bước, trọng số `alpha = softmax(w · tanh(W_f f + W_h h))` trên các vùng cho ra một vector
+ngữ cảnh; `[embedding; ngữ cảnh]` đi vào `nn.LSTMCell`. Trạng thái là `(h, c, vùng_đã_chiếu,
+khóa_attention)` nên `reorder_state` chỉ cần chọn lại theo chiều batch. Khoảng 8,8 triệu tham
+số. Kết quả so với baseline: [EXPERIMENTS.md](EXPERIMENTS.md).
+
 ## 8. Giải mã
 
 - Greedy theo batch (dùng khi validate) và beam search từng ảnh (mặc định beam 3).
 - Beam search xếp hạng theo `log_prob / độ_dài ^ 0,7` để không thiên về câu quá ngắn.
 - Độ dài tối đa bằng `text.max_length` (30 token).
+- **Chặn lặp n-gram** (`eval.no_repeat_ngram_size`, mặc định 0 = tắt): cấm sinh lại một n-gram
+  (tính trên token) đã có trong câu, cho cả greedy và beam search.
+- **Điều kiện dừng của beam search** (`eval.beam_stop`): `first` (mặc định, như cũ) bỏ câu đã
+  kết thúc ra khỏi beam và dừng khi đủ `beam_size` câu kết thúc; `best` giữ đủ beam và chỉ dừng
+  khi không câu dở nào còn có thể vượt câu tốt nhất đã kết thúc. `best` tìm được câu có điểm mô
+  hình cao hơn nhưng không cho caption tốt hơn (xem [EXPERIMENTS.md](EXPERIMENTS.md)).
+- `scripts/study_decoding.py` so nhiều cách giải mã của một checkpoint, chỉ trên val.
 
 ## 9. Đánh giá
 

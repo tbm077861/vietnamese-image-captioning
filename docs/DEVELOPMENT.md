@@ -111,6 +111,9 @@ python scripts/run_sweep.py configs/sweeps/                    # mọi *.yaml tr
 python scripts/run_sweep.py configs/baseline_lstm.yaml --seeds 42 43 44
 python scripts/update_experiments.py                           # sinh lại bảng docs/EXPERIMENTS.md
 python scripts/compare_runs.py --runs outputs/a outputs/b      # 50 ảnh val cố định, đọc bằng mắt
+
+# So các cách giải mã của một checkpoint trên val (beam, length penalty, điều kiện dừng, chặn lặp)
+python scripts/study_decoding.py --checkpoint outputs/attention_lstm/checkpoints/best.pt --no-repeat 0 3
 ```
 
 `run_sweep.py` bỏ qua run đã xong (`summary.json` có `status: completed`), chạy tiếp run dở từ
@@ -151,7 +154,11 @@ Trên Windows, khi in tiếng Việt ra console bị lỗi mã hóa thì thêm `
     nhiên, khóa tập test (`--final`), `train.py --init-from`, `run_sweep.py`,
     `update_experiments.py`, `compare_runs.py`. Độ nhiễu baseline qua ba seed: CIDEr val
     0,4199 ± 0,0164 (beam 3).
-  - Bước 2–4 chưa bắt đầu.
+  - **Bước 2 xong** – decoder `lstm_attention` (CIDEr val 0,4860 ± 0,0024, vượt baseline ngoài
+    mức nhiễu), tùy chọn giải mã `eval.no_repeat_ngram_size` và `eval.beam_stop`,
+    `study_decoding.py`. Cách giải mã của mô hình cuối: beam 3, LP 0,7, chặn lặp 3-gram.
+  - Bước 3–4 chưa merge. Nhánh `feat/strong-encoders` đã có một commit code encoder CLIP /
+    SigLIP (chưa có tài liệu, chưa huấn luyện); cache đặc trưng của hai encoder đã trích xong.
 - **Quy tắc đánh giá:** chọn mô hình và tinh chỉnh chỉ dựa trên val; tập test chỉ dùng một lần
   để báo cáo mô hình cuối cùng.
 
@@ -160,8 +167,7 @@ Trên Windows, khi in tiếng Việt ra console bị lỗi mã hóa thì thêm `
 Làm theo đúng thứ tự trong mục "Giai đoạn 5–6" của [ROADMAP.md](ROADMAP.md):
 
 1. ~~Bước 1 – Hạ tầng so sánh~~ (xong).
-2. **Bước 2 – LSTM có attention** (nhánh `feat/attention-decoder`), kèm kiểm tra beam search và
-   length penalty trên val. Cấu hình `configs/attention_lstm.yaml`.
+2. ~~Bước 2 – LSTM có attention và kiểm tra beam search~~ (xong).
 3. **Bước 3 – Encoder mạnh hơn:** đúng hai ứng viên (một CLIP, một SigLIP), lưu lưới patch; xác
    minh giấy phép trọng số tại nguồn trước khi tải, ghi vào `docs/MODELS.md`.
 4. **Bước 4 – Transformer decoder**, rồi chuẩn bị (không chạy) danh sách cấu hình cho Bước 5.
@@ -180,15 +186,17 @@ Các thư mục sau đã được tạo (không nằm trong git), không cần c
 - `outputs/baseline_lstm/`: baseline chính thức (checkpoint, log, kết quả đánh giá, `report.md`).
   Không xóa: đây là mốc so sánh.
 - `outputs/baseline_lstm_seed43/`, `outputs/baseline_lstm_seed44/`: baseline với seed khác, dùng
-  để đo độ nhiễu. Bảng `docs/EXPERIMENTS.md` được sinh từ các thư mục trong `outputs/`, nên xóa
+  để đo độ nhiễu. `outputs/attention_lstm*/`: ba seed của decoder attention (Bước 2), kèm
+  `decoding_study*.json`.
+- `data/features/uit_openviic/clip_vit_b16_224/`, `.../siglip_b16_224/`: cache đặc trưng CLIP và
+  SigLIP (lưới 196 × 768, mỗi cache 3,67 GB), trích bằng code của nhánh `feat/strong-encoders`.
+  Trọng số tải về nằm trong cache Hugging Face của người dùng, ngoài repo. Bảng `docs/EXPERIMENTS.md` được sinh từ các thư mục trong `outputs/`, nên xóa
   một thư mục run là mất dòng tương ứng ở lần sinh bảng sau.
 
 ### Việc còn dở
 
 - Dừng sớm với ngưỡng 5 epoch có thể dừng trước khi hội tụ (seed 44 của baseline dừng ở epoch
   19); cân nhắc nới ngưỡng ở lượt tinh chỉnh (Bước 5).
-- Beam search: beam 5 kém greedy trên cả val và test dù đã có chuẩn hóa độ dài; chưa tìm
-  nguyên nhân (Bước 2).
 - Chưa có CI; chạy `pytest` và `ruff check .` trước mỗi lần mở Pull Request. Nên chạy test trên
   một bản checkout sạch của nhánh (`git worktree`) vì thư mục làm việc có thể chứa file chưa
   commit che mất lỗi thiếu file.
