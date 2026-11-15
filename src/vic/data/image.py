@@ -11,6 +11,13 @@ from PIL import Image, ImageFile, ImageOps
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
 
+# name -> (mean, std) per channel, as used when the encoder weights were trained.
+NORMALIZATION = {
+    "imagenet": (IMAGENET_MEAN, IMAGENET_STD),
+    "clip": ((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+    "siglip": ((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+}
+
 # Some dataset files miss their last few bytes; decode them anyway instead of failing mid-run.
 # scripts/verify_data.py lists such files as "truncated".
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -36,10 +43,16 @@ def load_image(path: str | Path) -> Image.Image:
         return to_rgb(image)
 
 
-def preprocess_image(image: Image.Image, image_size: int = 224) -> torch.Tensor:
-    """Resize the whole image to a square (no cropping) and normalise it: (3, size, size)."""
+def preprocess_image(
+    image: Image.Image, image_size: int = 224, normalization: str = "imagenet"
+) -> torch.Tensor:
+    """Resize the whole image to a square (no cropping) and normalise it: (3, size, size).
+
+    ``normalization`` names the channel statistics of the encoder (see ``NORMALIZATION``).
+    """
+    if normalization not in NORMALIZATION:
+        raise ValueError(f"Unknown normalization {normalization!r}; use {sorted(NORMALIZATION)}")
     image = to_rgb(image).resize((image_size, image_size), Image.Resampling.BICUBIC)
     tensor = torch.from_numpy(np.asarray(image, dtype=np.float32) / 255.0).permute(2, 0, 1)
-    mean = torch.tensor(IMAGENET_MEAN).view(3, 1, 1)
-    std = torch.tensor(IMAGENET_STD).view(3, 1, 1)
-    return (tensor - mean) / std
+    mean, std = NORMALIZATION[normalization]
+    return (tensor - torch.tensor(mean).view(3, 1, 1)) / torch.tensor(std).view(3, 1, 1)

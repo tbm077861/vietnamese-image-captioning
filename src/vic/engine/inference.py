@@ -10,6 +10,7 @@ from PIL import Image
 from vic.data.image import load_image, preprocess_image
 from vic.engine.checkpoint import load_checkpoint, model_from_checkpoint
 from vic.models import beam_search, greedy_decode
+from vic.models.encoder import encoder_spec
 from vic.text.tokenizer import detokenize
 from vic.utils import get_device
 
@@ -21,7 +22,9 @@ class CaptionPredictor:
         self.model, self.vocab, self.config = model_from_checkpoint(
             checkpoint, with_encoder=True, device=self.device
         )
-        self.image_size = int(self.config["model"]["encoder"].get("image_size", 224))
+        encoder_config = self.config["model"]["encoder"]
+        self.image_size = int(encoder_config.get("image_size", 224))
+        self.normalization = encoder_spec(encoder_config["name"]).normalization
         eval_config = self.config.get("eval", {})
         self.default_beam_size = int(eval_config.get("beam_size", 3))
         self.length_penalty = float(eval_config.get("length_penalty", 0.7))
@@ -37,7 +40,8 @@ class CaptionPredictor:
         beam_size = self.default_beam_size if beam_size is None else beam_size
         vocab = self.vocab
         suppress_ids = (vocab.pad_id, vocab.bos_id, vocab.unk_id)
-        pixels = preprocess_image(image, self.image_size).unsqueeze(0).to(self.device)
+        pixels = preprocess_image(image, self.image_size, self.normalization)
+        pixels = pixels.unsqueeze(0).to(self.device)
         use_amp = self.device.type == "cuda"
         with torch.autocast(self.device.type, dtype=torch.float16, enabled=use_amp):
             features = self.model.encode(pixels)

@@ -20,14 +20,21 @@ from vic.text.vocab import Vocabulary
 class ImageStore:
     """Load and preprocess images from the raw dataset directory."""
 
-    def __init__(self, raw_dir: str | Path, records: list[dict], image_size: int = 224) -> None:
+    def __init__(
+        self,
+        raw_dir: str | Path,
+        records: list[dict],
+        image_size: int = 224,
+        normalization: str = "imagenet",
+    ) -> None:
         self.raw_dir = Path(raw_dir)
         self.image_size = image_size
+        self.normalization = normalization
         self._files = {record["image_id"]: record["file_name"] for record in records}
 
     def __getitem__(self, image_id: str) -> torch.Tensor:
         with Image.open(self.raw_dir / self._files[image_id]) as image:
-            return preprocess_image(image, self.image_size)
+            return preprocess_image(image, self.image_size, self.normalization)
 
 
 class CaptionPairDataset(Dataset):

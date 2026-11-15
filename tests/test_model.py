@@ -190,3 +190,25 @@ def test_frozen_encoder_stays_in_eval_mode_and_outputs_a_grid():
     assert not features.requires_grad
     with pytest.raises(ValueError):
         ImageEncoder("unknown")
+
+
+@pytest.mark.parametrize("name", ["clip_vit_b16", "siglip_b16"])
+def test_vision_transformer_encoders_output_the_patch_grid(name):
+    encoder = ImageEncoder(name, pretrained=False, trainable=False)  # random weights, no download
+    assert encoder.feature_dim == 768 and not encoder.training
+    assert not any(parameter.requires_grad for parameter in encoder.parameters())
+    features = encoder(torch.zeros(2, 3, 64, 64))  # 64 px / 16 px patches -> 4 x 4 grid
+    assert features.shape == (2, 16, 768) and not features.requires_grad
+
+
+@all_decoders
+def test_feature_norm_makes_decoders_insensitive_to_feature_scale(decoder_type):
+    torch.manual_seed(0)
+    decoder_config = {**DECODER_CONFIGS[decoder_type], "feature_norm": True}
+    config = {"encoder": {"name": "clip_vit_b16"}, "decoder": decoder_config}
+    model = build_model(config, VOCAB_SIZE, PAD, with_encoder=False).eval()
+    features = torch.randn(2, 5, 768)
+    input_ids = torch.randint(3, VOCAB_SIZE, (2, 4))
+    logits = model(input_ids, features=features)
+    assert logits.shape == (2, 4, VOCAB_SIZE)
+    assert torch.allclose(logits, model(input_ids, features=features * 50), atol=1e-3)

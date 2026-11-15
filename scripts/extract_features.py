@@ -20,6 +20,7 @@ from vic.data.annotations import load_annotations
 from vic.data.dataset import ImageDataset, ImageStore, collate_images
 from vic.data.features import INDEX_FILE, create_feature_cache, write_feature_index
 from vic.models import ImageEncoder
+from vic.models.encoder import encoder_spec
 from vic.utils import get_device, read_json, setup_logging
 
 
@@ -39,6 +40,7 @@ def main() -> None:
     paths = data_paths(config)
     encoder_config = config["model"]["encoder"]
     image_size = int(encoder_config.get("image_size", 224))
+    normalization = encoder_spec(encoder_config["name"]).normalization
     records = load_annotations(paths.annotations)["images"]
     image_ids = [record["image_id"] for record in records]
 
@@ -54,7 +56,7 @@ def main() -> None:
     use_amp = device.type == "cuda"
     encoder = ImageEncoder(encoder_config["name"], pretrained=True, trainable=False).to(device)
     loader = DataLoader(
-        ImageDataset(records, ImageStore(paths.raw_dir, records, image_size)),
+        ImageDataset(records, ImageStore(paths.raw_dir, records, image_size, normalization)),
         batch_size=args.batch_size,
         shuffle=False,
         collate_fn=collate_images,
@@ -84,6 +86,7 @@ def main() -> None:
         image_ids,
         encoder=encoder.name,
         image_size=image_size,
+        normalization=normalization,
         shape=list(cache.shape),
         dtype="float16",
     )

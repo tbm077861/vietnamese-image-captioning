@@ -8,6 +8,8 @@ Every decoder exposes the same interface so that training and decoding code is s
 - ``reorder_state(state, index) -> state``: select / duplicate batch entries (beam search).
 
 ``features`` is the encoder grid (batch, regions, channels), possibly in half precision.
+Every decoder accepts ``feature_norm=True`` to apply a LayerNorm to the incoming features;
+use it for encoders whose features are not on a unit scale (ViT residual streams).
 """
 
 from __future__ import annotations
@@ -30,8 +32,10 @@ class LSTMDecoder(nn.Module):
         num_layers: int = 1,
         dropout: float = 0.5,
         pad_id: int = 0,
+        feature_norm: bool = False,
     ) -> None:
         super().__init__()
+        self.feature_norm = nn.LayerNorm(feature_dim) if feature_norm else nn.Identity()
         self.num_layers = num_layers
         self.hidden_dim = hidden_dim
         self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=pad_id)
@@ -48,7 +52,8 @@ class LSTMDecoder(nn.Module):
         self.output = nn.Linear(hidden_dim, vocab_size)
 
     def init_state(self, features: torch.Tensor) -> State:
-        pooled = features.float().mean(dim=1) if features.dim() == 3 else features.float()
+        features = self.feature_norm(features.float())
+        pooled = features.mean(dim=1) if features.dim() == 3 else features
         pooled = self.dropout(pooled)
         batch = pooled.size(0)
 
@@ -96,8 +101,10 @@ class AttentionLSTMDecoder(nn.Module):
         attention_dim: int = 512,
         dropout: float = 0.5,
         pad_id: int = 0,
+        feature_norm: bool = False,
     ) -> None:
         super().__init__()
+        self.feature_norm = nn.LayerNorm(feature_dim) if feature_norm else nn.Identity()
         self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=pad_id)
         self.project = nn.Linear(feature_dim, attention_dim)
         self.init_h = nn.Linear(attention_dim, hidden_dim)
@@ -112,7 +119,8 @@ class AttentionLSTMDecoder(nn.Module):
     def init_state(self, features: torch.Tensor) -> AttentionState:
         if features.dim() == 2:  # a pooled vector is a grid with a single region
             features = features.unsqueeze(1)
-        regions = self.dropout(torch.relu(self.project(features.float())))
+        features = self.feature_norm(features.float())
+        regions = self.dropout(torch.relu(self.project(features)))
         pooled = regions.mean(dim=1)
         hidden = torch.tanh(self.init_h(pooled))
         cell = torch.tanh(self.init_c(pooled))

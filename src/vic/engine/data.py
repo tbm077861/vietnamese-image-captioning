@@ -18,6 +18,7 @@ from vic.data.dataset import (
     collate_pairs,
 )
 from vic.data.features import FeatureStore
+from vic.models.encoder import encoder_spec
 from vic.text.vocab import Vocabulary
 from vic.utils import read_json
 
@@ -50,7 +51,13 @@ def load_experiment_data(config: dict, vocab: Vocabulary | None = None) -> Exper
                 "re-run scripts/extract_features.py"
             )
     else:
-        store = ImageStore(paths.raw_dir, images, config["model"]["encoder"].get("image_size", 224))
+        encoder = config["model"]["encoder"]
+        store = ImageStore(
+            paths.raw_dir,
+            images,
+            encoder.get("image_size", 224),
+            encoder_spec(encoder["name"]).normalization,
+        )
     return ExperimentData(vocab, records, store, use_features)
 
 
