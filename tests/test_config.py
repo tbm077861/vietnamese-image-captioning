@@ -67,3 +67,21 @@ def test_config_differences_lists_changed_leaves():
         "train.epochs: None -> 3",
     ]
     assert config_differences(old, old) == []
+
+
+def test_every_experiment_config_loads_and_builds(monkeypatch):
+    from pathlib import Path
+
+    from vic.engine.sweep import sweep_configs
+    from vic.models.captioner import build_model
+
+    root = Path(__file__).resolve().parents[1]
+    monkeypatch.chdir(root)  # base_config and dataset_config paths are relative to the repo
+    paths = sorted(Path("configs").glob("*.yaml")) + sorted(Path("configs/sweeps").glob("*.yaml"))
+    configs = sweep_configs(paths)  # also rejects duplicate run names
+    assert len(configs) == len(paths)
+    for config in configs:
+        model = build_model(config["model"], vocab_size=50, pad_id=0, with_encoder=False)
+        assert sum(p.numel() for p in model.parameters()) > 0, config["run_name"]
+    # The prepared Step 5 sweep stays within the approved budget of 15 runs.
+    assert len(sweep_configs(["configs/sweeps"])) <= 15

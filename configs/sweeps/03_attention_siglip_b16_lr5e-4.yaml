@@ -1,0 +1,9 @@
+# Step 5 sweep, run 03: attention_siglip_b16 with learning rate 5e-4 (base: 1e-3).
+# One factor changed; everything else is inherited.
+
+base_config: configs/attention_siglip_b16.yaml
+run_name: attention_siglip_b16_lr5e-4
+notes: "Bước 5: lr 5e-4"
+
+train:
+  lr: 5.0e-4

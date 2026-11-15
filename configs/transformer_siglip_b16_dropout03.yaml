@@ -1,0 +1,10 @@
+# transformer_siglip_b16 with dropout 0.3 (top of the 0.1-0.3 range of the plan): with dropout
+# 0.1 the validation loss rises from epoch 8 on. Only the dropout differs.
+
+base_config: configs/transformer_siglip_b16.yaml
+run_name: transformer_siglip_b16_dropout03
+notes: Transformer 3 lớp, SigLIP ViT-B/16, dropout 0,3
+
+model:
+  decoder:
+    dropout: 0.3

@@ -1,0 +1,10 @@
+# Step 5 sweep, run 05: attention_siglip_b16 with LSTM width 1024 (base: 512); the attention and embedding sizes stay 512.
+# One factor changed; everything else is inherited.
+
+base_config: configs/attention_siglip_b16.yaml
+run_name: attention_siglip_b16_hidden1024
+notes: "Bước 5: LSTM rộng 1024"
+
+model:
+  decoder:
+    hidden_dim: 1024

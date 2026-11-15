@@ -1,0 +1,9 @@
+# Step 5 sweep, run 06: attention_siglip_b16 with AdamW weight decay 0.01 (base: 0.0).
+# One factor changed; everything else is inherited.
+
+base_config: configs/attention_siglip_b16.yaml
+run_name: attention_siglip_b16_wd001
+notes: "Bước 5: weight decay 0,01"
+
+train:
+  weight_decay: 0.01

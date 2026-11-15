@@ -24,6 +24,10 @@ không xuất hiện ở đây. Phần giữa hai dấu mốc bên dưới do `s
 | `attention_clip_b16_seed44` | clip_vit_b16 @224 | lstm_attention | 44 | 0.6464 | 39.27 | 0.6435 | 0.6598 | 39.69 | 1762 | 517 | 13.6 | 18.1 | 9.4 | 8.16 | 20.9 | 1365 | 27 | `aae1935` | đặc trưng CLIP ViT-B/16, lưới 14x14; override: data.features_in_memory=false |
 | `attention_siglip_b16_seed43` | siglip_b16 @224 | lstm_attention | 43 | 0.6519 | 39.19 | 0.6409 | 0.6659 | 39.80 | 1781 | 500 | 13.5 | 16.4 | 8.6 | 8.16 | 15.8 | 1365 | 17 | `aae1935` | đặc trưng SigLIP ViT-B/16, lưới 14x14; override: data.features_in_memory=false |
 | `attention_siglip_b16_seed44` | siglip_b16 @224 | lstm_attention | 44 | 0.6633 | 39.39 | 0.6549 | 0.6764 | 39.89 | 1762 | 514 | 13.8 | 19.1 | 10.5 | 8.16 | 19.4 | 1365 | 23 | `aae1935` | đặc trưng SigLIP ViT-B/16, lưới 14x14; override: data.features_in_memory=false |
+| `transformer_siglip_b16` | siglip_b16 @224 | transformer | 42 | 0.6287 | 37.11 | 0.6263 | 0.6410 | 37.41 | 1752 | 479 | 13.6 | 15.7 | 9.3 | 14.96 | 8.8 | 778 | 8 | `07e9c4c` | Transformer 3 lớp, đặc trưng SigLIP ViT-B/16, lưới 14x14; override: data.features_in_memory=false |
+| `transformer` | resnet50 @224 | transformer | 42 | 0.4541 | 28.81 | 0.4490 | 0.4682 | 29.33 | 1613 | 395 | 14.0 | 18.1 | 13.1 | 15.61 | 6.3 | 637 | 6 | `07e9c4c` | Transformer 3 lớp trên lưới 7x7; override: data.features_in_memory=false |
+| `transformer_clip_b16` | clip_vit_b16 @224 | transformer | 42 | 0.6107 | 36.90 | 0.5927 | 0.6198 | 37.17 | 1742 | 481 | 13.4 | 11.8 | 6.3 | 14.96 | 9.1 | 778 | 8 | `07e9c4c` | Transformer 3 lớp, đặc trưng CLIP ViT-B/16, lưới 14x14; override: data.features_in_memory=false |
+| `transformer_siglip_b16_dropout03` | siglip_b16 @224 | transformer | 42 | 0.6437 | 36.90 | 0.6473 | 0.6677 | 37.83 | 1740 | 498 | 14.5 | 19.5 | 14.1 | 14.96 | 16.0 | 779 | 18 | `07e9c4c` | Transformer 3 lớp, SigLIP ViT-B/16, dropout 0,3; override: data.features_in_memory=false |
 
 Để so sánh, 10002 câu tham chiếu của tập val: 2358 âm tiết khác nhau, độ dài trung bình 18.6, lặp 2-gram 20.0%, lặp 3-gram 6.4%.
 
@@ -220,3 +224,53 @@ mọi ghi đè cấu hình (`overrides`); bảng ở đầu file hiển thị ch
 Cache đặc trưng đã được kiểm tra lại bằng mã đã commit: SigLIP trùng từng bit; CLIP trùng từng
 bit khi trích theo đúng các lô đã dùng, nhưng đặc trưng float16 của CLIP phụ thuộc cỡ lô
 (chi tiết trong [MODELS.md](MODELS.md)).
+
+### Transformer decoder (Bước 4)
+
+Decoder `transformer`: 3 lớp pre-norm, `d_model` 512, 8 đầu, feed-forward 2048, cross-attention
+lên lưới vùng (có embedding vị trí học được cho từng vùng), embedding dùng chung với lớp ra. Cấu
+hình khởi điểm theo kế hoạch: lr 2e-4, warm-up 1.500 bước, label smoothing 0,1, batch 64; số
+epoch tối đa và luật dừng sớm như các run khác. Mỗi cấu hình chạy một seed (42).
+
+| Encoder | Transformer | Transformer, giải mã chốt | LSTM attention (3 seed) | BLEU-4 Transformer | BLEU-4 LSTM attention | Epoch tốt nhất |
+|---|---:|---:|---:|---:|---:|---:|
+| ResNet-50 | 0.4541 | 0.4682 | 0.4860 ± 0.0024 | 28.81 | 31.58 ± 0.35 | 6 |
+| CLIP ViT-B/16 | 0.6107 | 0.6198 | 0.6512 ± 0.0046 | 36.90 | 39.19 ± 0.07 | 8 |
+| SigLIP ViT-B/16 | 0.6287 | 0.6410 | 0.6570 ± 0.0058 | 37.11 | 39.31 ± 0.11 | 8 |
+| SigLIP ViT-B/16, dropout 0,3 | 0.6437 | 0.6677 | 0.6570 ± 0.0058 | 36.90 | 39.31 ± 0.11 | 18 |
+
+- **Transformer chưa vượt LSTM attention trên encoder nào.** Với cấu hình khởi điểm, CIDEr thấp
+  hơn LSTM attention cùng encoder 0,028–0,041 và BLEU-4 thấp hơn 2,2–2,8 điểm. Thứ tự encoder
+  giữ nguyên: SigLIP > CLIP > ResNet-50.
+- **Nguyên nhân chính là overfit sớm.** Với dropout 0,1, loss val thấp nhất ở epoch 6–8 rồi tăng
+  dần; dừng sớm cắt run ở epoch 11–13. Mô hình có 15,0–15,6 triệu tham số, gần gấp đôi LSTM
+  attention (8,2–8,8 triệu), trên khoảng 41.000 câu huấn luyện.
+- **Dropout 0,3** (mức trên của khoảng 0,1–0,3 trong kế hoạch, chạy thêm vì overfit) sửa được
+  phần lớn: loss val giảm tới epoch 17, epoch tốt nhất 18, CIDEr tăng 0,015 lên 0,6437. Vẫn thấp
+  hơn LSTM attention + SigLIP 0,013, vượt 0,01 và vượt nhẹ hai lần độ lệch chuẩn của LSTM
+  attention (0,0116); Transformer mới đo một seed. BLEU-4 thấp hơn 2,4 điểm, vượt xa mức nhiễu. Với giải mã chốt, CIDEr chỉ còn kém 0,004 (0,6677 so với
+  0,6713 ± 0,0052).
+- **Câu lặp cụm nhiều hơn:** 14,1% câu của bản dropout 0,3 có cụm 3 âm tiết lặp lại (LSTM
+  attention + SigLIP: 8,6–10,5%), nên chặn lặp 3-gram giúp Transformer nhiều hơn (+0,024 CIDEr so
+  với +0,013–0,016). Trên encoder ViT, số câu khác nhau (1.740–1.752) và số âm tiết khác nhau
+  (479–498) thấp hơn LSTM attention cùng encoder; trên ResNet-50 thì Transformer nhiều câu khác
+  nhau hơn (1.613 so với 1.496–1.600).
+- **Chi phí:** VRAM đỉnh 778 MB trên ViT (LSTM attention 1.365 MB) và 637 MB trên ResNet-50; mỗi
+  bước khoảng 46 ms với batch 64 (SigLIP), tức một epoch khoảng 30 giây, tương đương LSTM attention. Huấn
+  luyện 6–16 phút vì dừng sớm hơn.
+- Vì Transformer kém rõ ở BLEU-4, tiêu chí chọn mô hình ("BLEU-4 không kém hơn ngoài mức
+  nhiễu") đã loại nó, nên không chạy thêm seed 43/44 cho Transformer.
+
+**Cặp đề xuất: LSTM attention + SigLIP ViT-B/16** (`attention_siglip_b16`). CIDEr val cao nhất
+(0,6570 ± 0,0058; giải mã chốt 0,6713 ± 0,0052), BLEU-4 cao nhất (39,31 ± 0,11), 8,16 triệu
+tham số, VRAM đỉnh khoảng 1,4 GB, huấn luyện 16–21 phút. Lượt quét Bước 5 dựng trên cặp này
+(`configs/sweeps/`, xem ROADMAP).
+
+RAM của các run Bước 4, đo như ở Bước 3 (ngưỡng dừng 1,0 GB; không lần nào bị dừng):
+
+| Run | Working set đỉnh (GB) | Private đỉnh (GB) | RAM trống thấp nhất (GB) |
+|---|---:|---:|---:|
+| `transformer_siglip_b16` | 5,22 | 5,04 | 1,23 |
+| `transformer` | 4,06 | 4,90 | 3,47 |
+| `transformer_clip_b16` | 3,91 | 5,11 | 2,23 |
+| `transformer_siglip_b16_dropout03` | 5,25 | 5,07 | 1,67 |
