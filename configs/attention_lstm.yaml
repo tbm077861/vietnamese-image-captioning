@@ -1,0 +1,60 @@
+# LSTM decoder with soft attention over the 7 x 7 ResNet-50 grid (Show, Attend and Tell style).
+# Same data, text settings and training schedule as baseline_lstm.yaml; only the decoder differs.
+
+seed: 42
+run_name: attention_lstm
+output_dir: outputs
+data_root: data
+device: auto
+notes: attention trên lưới 7x7
+
+dataset_config: configs/datasets/uit_openviic.yaml
+
+text:
+  level: word
+  lowercase: true
+  strip_punctuation: true
+  min_freq: 3
+  max_vocab_size: null
+  max_length: 30
+
+data:
+  use_cached_features: true
+  features_in_memory: true
+
+model:
+  encoder:
+    name: resnet50
+    image_size: 224
+    trainable: false
+  decoder:
+    type: lstm_attention
+    embed_dim: 512
+    hidden_dim: 512
+    attention_dim: 512
+    dropout: 0.5
+
+train:
+  epochs: 30
+  batch_size: 128
+  lr: 1.0e-3
+  encoder_lr: 1.0e-5
+  weight_decay: 0.0
+  grad_clip: 5.0
+  label_smoothing: 0.0
+  scheduler: cosine
+  warmup_steps: 300
+  amp: true
+  num_workers: 0
+  log_every: 50
+  save_every_steps: 200
+  eval_every_epochs: 1
+  monitor: CIDEr
+  early_stopping_patience: 5
+  tensorboard: true
+  deterministic: false
+
+eval:
+  beam_size: 3
+  length_penalty: 0.7
+  batch_size: 128
