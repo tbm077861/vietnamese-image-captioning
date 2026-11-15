@@ -10,14 +10,20 @@ không xuất hiện ở đây. Phần giữa hai dấu mốc bên dưới do `s
 
 | Run | Encoder | Decoder | Seed | CIDEr (beam 3) | BLEU-4 | CIDEr (greedy) | CIDEr (giải mã chốt) | BLEU-4 (giải mã chốt) | Câu khác nhau | Âm tiết khác nhau | Độ dài TB | Lặp 2-gram (%) | Lặp 3-gram (%) | Tham số (triệu) | Huấn luyện (phút) | VRAM đỉnh (MB) | Epoch tốt nhất | Commit | Ghi chú |
 |---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
-| `baseline_lstm` | resnet50 @224 | lstm | 42 | 0.4274 | 28.74 | 0.4232 | — | — | 975 | 357 | 14.3 | 15.8 | 8.8 | 7.77 | ~8.3 | 385 | 28 | — |  |
-| `baseline_lstm_seed43` | resnet50 @224 | lstm | 43 | 0.4312 | 28.43 | 0.4304 | — | — | 1036 | 349 | 14.6 | 17.6 | 8.9 | 7.77 | 11.0 | 383 | 20 | `cb97a88` |  |
-| `baseline_lstm_seed44` | resnet50 @224 | lstm | 44 | 0.4010 | 27.22 | 0.4156 | — | — | 918 | 310 | 14.5 | 14.8 | 5.8 | 7.77 | 6.6 | 382 | 14 | `cb97a88` |  |
-| `attention_lstm` | resnet50 @224 | lstm_attention | 42 | 0.4887 | 31.51 | 0.4874 | — | — | 1496 | 409 | 14.0 | 21.2 | 9.1 | 8.82 | 11.2 | 666 | 11 | `ce2723f` | attention trên lưới 7x7 |
-| `attention_lstm_seed43` | resnet50 @224 | lstm_attention | 43 | 0.4840 | 31.95 | 0.4849 | — | — | 1525 | 422 | 13.5 | 14.7 | 6.7 | 8.82 | 15.9 | 667 | 16 | `ce2723f` | attention trên lưới 7x7 |
-| `attention_lstm_seed44` | resnet50 @224 | lstm_attention | 44 | 0.4853 | 31.26 | 0.4846 | — | — | 1600 | 421 | 14.0 | 18.4 | 10.7 | 8.82 | 16.6 | 667 | 19 | `ce2723f` | attention trên lưới 7x7 |
-| `attention_clip_b16` | clip_vit_b16 @224 | lstm_attention | 42 | 0.6556 | 39.17 | 0.6281 | — | — | 1778 | 507 | 13.5 | 16.7 | 8.0 | 8.16 | 18.5 | 1363 | 21 | `85339fd` | đặc trưng CLIP ViT-B/16, lưới 14x14 |
-| `attention_siglip_b16` | siglip_b16 @224 | lstm_attention | 42 | — | — | — | — | — | — | — | — | — | — | 8.16 | — | — | — | — | đặc trưng SigLIP ViT-B/16, lưới 14x14; **chưa có kết quả** |
+| `baseline_lstm` | resnet50 @224 | lstm | 42 | 0.4274 | 28.74 | 0.4232 | 0.4331 | 29.12 | 975 | 357 | 14.3 | 15.8 | 8.8 | 7.77 | ~8.3 | 385 | 28 | — |  |
+| `baseline_lstm_seed43` | resnet50 @224 | lstm | 43 | 0.4312 | 28.43 | 0.4304 | 0.4391 | 29.00 | 1036 | 349 | 14.6 | 17.6 | 8.9 | 7.77 | 11.0 | 383 | 20 | `cb97a88` |  |
+| `baseline_lstm_seed44` | resnet50 @224 | lstm | 44 | 0.4010 | 27.22 | 0.4156 | 0.4050 | 27.51 | 918 | 310 | 14.5 | 14.8 | 5.8 | 7.77 | 6.6 | 382 | 14 | `cb97a88` |  |
+| `attention_lstm` | resnet50 @224 | lstm_attention | 42 | 0.4887 | 31.51 | 0.4874 | 0.4994 | 32.02 | 1496 | 409 | 14.0 | 21.2 | 9.1 | 8.82 | 11.2 | 666 | 11 | `ce2723f` | attention trên lưới 7x7 |
+| `attention_lstm_seed43` | resnet50 @224 | lstm_attention | 43 | 0.4840 | 31.95 | 0.4849 | 0.4899 | 32.18 | 1525 | 422 | 13.5 | 14.7 | 6.7 | 8.82 | 15.9 | 667 | 16 | `ce2723f` | attention trên lưới 7x7 |
+| `attention_lstm_seed44` | resnet50 @224 | lstm_attention | 44 | 0.4853 | 31.26 | 0.4846 | 0.4962 | 32.09 | 1600 | 421 | 14.0 | 18.4 | 10.7 | 8.82 | 16.6 | 667 | 19 | `ce2723f` | attention trên lưới 7x7 |
+| `attention_clip_b16` | clip_vit_b16 @224 | lstm_attention | 42 | 0.6556 | 39.17 | 0.6281 | 0.6675 | 39.79 | 1778 | 507 | 13.5 | 16.7 | 8.0 | 8.16 | 18.5 | 1363 | 21 | `85339fd` | đặc trưng CLIP ViT-B/16, lưới 14x14 |
+| `attention_siglip_b16` | siglip_b16 @224 | lstm_attention | 42 | 0.6557 | 39.35 | 0.6496 | 0.6716 | 39.95 | 1757 | 523 | 13.6 | 17.7 | 9.2 | 8.16 | 21.0 | 1364 | 26 | `aae1935` | đặc trưng SigLIP ViT-B/16, lưới 14x14; override: data.features_in_memory=false; ngắt rồi resume từ epoch 4 (cấu hình đổi khi resume: data.features_in_memory: True -> False) |
+| `lstm_clip_b16` | clip_vit_b16 @224 | lstm | 42 | 0.4535 | 29.72 | 0.4362 | 0.4580 | 29.88 | 1017 | 355 | 14.0 | 13.0 | 5.0 | 6.46 | 7.4 | 443 | 21 | `aae1935` | đặc trưng CLIP ViT-B/16, lưới 14x14; override: data.features_in_memory=false |
+| `lstm_siglip_b16` | siglip_b16 @224 | lstm | 42 | 0.4826 | 31.32 | 0.4785 | 0.4870 | 31.53 | 1064 | 380 | 14.1 | 10.9 | 4.7 | 6.46 | 7.2 | 443 | 21 | `aae1935` | đặc trưng SigLIP ViT-B/16, lưới 14x14; override: data.features_in_memory=false |
+| `attention_clip_b16_seed43` | clip_vit_b16 @224 | lstm_attention | 43 | 0.6515 | 39.13 | 0.6379 | 0.6641 | 39.46 | 1764 | 515 | 13.7 | 18.6 | 10.1 | 8.16 | 18.7 | 1364 | 21 | `aae1935` | đặc trưng CLIP ViT-B/16, lưới 14x14; override: data.features_in_memory=false; ngắt rồi resume từ epoch 15; ngắt rồi resume từ epoch 16 |
+| `attention_clip_b16_seed44` | clip_vit_b16 @224 | lstm_attention | 44 | 0.6464 | 39.27 | 0.6435 | 0.6598 | 39.69 | 1762 | 517 | 13.6 | 18.1 | 9.4 | 8.16 | 20.9 | 1365 | 27 | `aae1935` | đặc trưng CLIP ViT-B/16, lưới 14x14; override: data.features_in_memory=false |
+| `attention_siglip_b16_seed43` | siglip_b16 @224 | lstm_attention | 43 | 0.6519 | 39.19 | 0.6409 | 0.6659 | 39.80 | 1781 | 500 | 13.5 | 16.4 | 8.6 | 8.16 | 15.8 | 1365 | 17 | `aae1935` | đặc trưng SigLIP ViT-B/16, lưới 14x14; override: data.features_in_memory=false |
+| `attention_siglip_b16_seed44` | siglip_b16 @224 | lstm_attention | 44 | 0.6633 | 39.39 | 0.6549 | 0.6764 | 39.89 | 1762 | 514 | 13.8 | 19.1 | 10.5 | 8.16 | 19.4 | 1365 | 23 | `aae1935` | đặc trưng SigLIP ViT-B/16, lưới 14x14; override: data.features_in_memory=false |
 
 Để so sánh, 10002 câu tham chiếu của tập val: 2358 âm tiết khác nhau, độ dài trung bình 18.6, lặp 2-gram 20.0%, lặp 3-gram 6.4%.
 
@@ -27,8 +33,10 @@ Trung bình ± độ lệch chuẩn mẫu của các run cùng cấu hình, ch�
 
 | Cấu hình | Seed | CIDEr | BLEU-4 | CIDEr (giải mã chốt) |
 |---|---|---:|---:|---:|
-| `baseline_lstm` | 42, 43, 44 | 0.4199 ± 0.0164 | 28.13 ± 0.80 | — |
-| `attention_lstm` | 42, 43, 44 | 0.4860 ± 0.0024 | 31.58 ± 0.35 | — |
+| `baseline_lstm` | 42, 43, 44 | 0.4199 ± 0.0164 | 28.13 ± 0.80 | 0.4257 ± 0.0182 |
+| `attention_lstm` | 42, 43, 44 | 0.4860 ± 0.0024 | 31.58 ± 0.35 | 0.4952 ± 0.0048 |
+| `attention_clip_b16` | 42, 43, 44 | 0.6512 ± 0.0046 | 39.19 ± 0.07 | 0.6638 ± 0.0039 |
+| `attention_siglip_b16` | 42, 43, 44 | 0.6570 ± 0.0058 | 39.31 ± 0.11 | 0.6713 ± 0.0052 |
 
 <!-- experiments:end -->
 
@@ -137,3 +145,78 @@ hợp.
   (+0,5 đến +1,2 điểm) và CIDEr ngang nhau (thắng 2 trên 3 seed, chênh dưới 0,004); với baseline
   thì lẫn lộn (greedy thắng rõ ở seed 44). Greedy luôn cho nhiều câu khác nhau hơn. Giữ beam 3
   cho các mô hình có attention; xem lại lựa chọn này trên mô hình cuối ở Bước 5.
+
+### Encoder mạnh hơn (Bước 3)
+
+CIDEr val, beam 3 theo giao thức so sánh. Ba seed: trung bình ± độ lệch chuẩn mẫu; một seed:
+seed 42. Giấy phép và cách lấy đặc trưng của hai encoder: [MODELS.md](MODELS.md).
+
+| Encoder | LSTM | LSTM attention | LSTM attention, giải mã chốt | Câu khác nhau (attention) | Âm tiết khác nhau (attention) |
+|---|---:|---:|---:|---:|---:|
+| ResNet-50, lưới 7 × 7 × 2048 | 0.4199 ± 0.0164 | 0.4860 ± 0.0024 | 0.4952 ± 0.0048 | 1.496–1.600 | 409–422 |
+| CLIP ViT-B/16, lưới 14 × 14 × 768 | 0.4535 (1 seed) | 0.6512 ± 0.0046 | 0.6638 ± 0.0039 | 1.762–1.778 | 507–517 |
+| SigLIP ViT-B/16, lưới 14 × 14 × 768 | 0.4826 (1 seed) | **0.6570 ± 0.0058** | **0.6713 ± 0.0052** | 1.757–1.781 | 500–523 |
+
+- **Encoder ViT là mức tăng lớn nhất tới giờ, nhưng chỉ khi decoder có attention.** Với LSTM
+  attention, CLIP và SigLIP hơn ResNet-50 lần lượt 0,165 và 0,171 CIDEr, gấp hàng chục lần độ
+  nhiễu; BLEU-4 từ 31,58 lên 39,19 và 39,31. Với decoder LSTM không attention (chỉ thấy trung
+  bình các vùng), mức tăng nhỏ hơn nhiều: so với seed 42 của baseline (0,4274), CLIP +0,026 và
+  SigLIP +0,055, mới đo một seed. Lưới 196 vùng của ViT chỉ phát huy khi decoder chọn được vùng
+  để nhìn.
+- **CLIP và SigLIP ngang nhau.** SigLIP cao hơn 0,0058 CIDEr, dưới 0,01 và dưới hai lần độ lệch
+  chuẩn (khoảng 0,012), nên theo quy tắc so sánh công bằng đây không phải chênh lệch thật.
+  SigLIP cũng nhỉnh hơn với giải mã chốt (+0,0075) và BLEU-4 (+0,12), đều trong mức nhiễu.
+- **Chọn SigLIP** theo tiêu chí đã thống nhất: CIDEr val beam 3 trung bình ba seed cao hơn. Hai
+  lý do phụ cùng chiều: giấy phép Apache-2.0 không kèm giới hạn phạm vi sử dụng như model card
+  của CLIP, và đặc trưng SigLIP không phụ thuộc cỡ lô khi tính ở float16 (CLIP thì có, xem
+  MODELS.md). Vì hai encoder sát nhau, Bước 4 thử Transformer trên cả hai như kế hoạch.
+- **Câu đa dạng hơn:** 1.757–1.781 câu khác nhau trên 2.011 ảnh và 500–523 âm tiết khác
+  nhau, so với 1.496–1.600 và 409–422 của ResNet-50 + attention. Độ dài trung bình vẫn 13,5–13,8
+  âm tiết, ngắn hơn câu tham chiếu (18,6). Tỉ lệ câu lặp cụm 3 âm tiết (8,0–10,5%) chưa giảm;
+  giải mã chốt (chặn lặp 3-gram) xử lý phần này và nâng CIDEr thêm 0,012–0,016.
+- **Chi phí:** 8,16 triệu tham số (ít hơn 8,82 triệu của ResNet-50 + attention vì đặc trưng 768
+  chiều thay vì 2048). VRAM đỉnh khoảng 1.365 MB, gấp đôi, vì attention chạy trên 196 vùng thay
+  vì 49. Huấn luyện 16–21 phút (epoch tốt nhất 17–27). Mỗi cache đặc trưng 3,67 GB trên đĩa.
+- **Cấu hình CLIP / SigLIP mặc định `data.features_in_memory: false`** (đọc cache bằng
+  memory-map). Nạp cả cache 3,67 GB vào RAM đã làm máy phát triển gần hết bộ nhớ (xem bảng RAM
+  bên dưới). Đổi này không đổi giá trị đặc trưng nên không đổi kết quả.
+
+**RAM của từng lần chạy.** Đo mỗi 5 giây trên tiến trình Python đang huấn luyện: working set,
+bộ nhớ private, và RAM trống thấp nhất của cả máy. Script theo dõi dừng lượt chạy khi RAM trống
+xuống dưới ngưỡng (1,5 GB; 1,0 GB ở lần cuối); không đặt giới hạn working set ở lần nào. Hai run
+đầu tiên chạy trước khi có script này.
+
+| Lần chạy | `features_in_memory` | Working set đỉnh (GB) | Private đỉnh (GB) | RAM trống thấp nhất (GB) | Kết quả |
+|---|---|---:|---:|---:|---|
+| `attention_clip_b16` | true | chưa đo | chưa đo | chưa đo | xong |
+| `attention_siglip_b16`, lần đầu | true | chưa đo | chưa đo | chưa đo | bị ngắt ở epoch 5 khi máy gần hết RAM |
+| `attention_siglip_b16`, chạy tiếp | false | 5,50 | 5,73 | 1,78 | xong |
+| `lstm_clip_b16` | false | 5,23 | 4,64 | 1,61 | xong |
+| `lstm_siglip_b16` | false | 4,12 | 4,66 | 3,22 | xong |
+| 6 run ResNet-50, chỉ đánh giá giải mã chốt | false | 1,98–2,09 | 3,15–3,24 | 5,64–5,74 | xong |
+| `attention_clip_b16_seed43`, lần 1 (ngưỡng 1,5 GB) | false | 5,33 | 5,39 | 1,33 | dừng ở epoch 16 |
+| `attention_clip_b16_seed43`, lần 2 (ngưỡng 1,5 GB) | false | 5,38 | 5,42 | 1,50 | dừng ở epoch 17 |
+| `attention_clip_b16_seed43`, lần 3 (ngưỡng 1,0 GB) | false | 5,44 | 5,66 | 1,72 | xong |
+| `attention_clip_b16_seed44` | false | 5,41 | 5,72 | 2,20 | xong |
+| `attention_siglip_b16_seed43` | false | 4,16 | 5,72 | 2,17 | xong |
+| `attention_siglip_b16_seed44` | false | 4,11 | 5,72 | 2,60 | xong |
+
+- Hai lần dừng của `attention_clip_b16_seed43` xảy ra khi các ứng dụng khác trên máy còn mở;
+  trước lần 3, RAM trống được nâng từ 5,58 lên 6,99 GB bằng cách đóng bớt ứng dụng.
+- Bộ nhớ private của tiến trình huấn luyện giữ ở 5,66–5,72 GB qua bốn run liên tiếp trong cùng
+  một tiến trình, nên không thấy rò bộ nhớ giữa các run. Phần lớn là chi phí cố định của PyTorch
+  và CUDA: tiến trình chỉ đánh giá đã chiếm khoảng 3,2 GB private.
+
+**Run bị ngắt rồi chạy tiếp.** `summary.json` ghi lại mỗi lần chạy tiếp (`resume_history`) và
+mọi ghi đè cấu hình (`overrides`); bảng ở đầu file hiển thị chúng trong cột ghi chú.
+
+- `attention_siglip_b16` (seed 42) bị ngắt ở epoch 5 khi đang nạp cả cache vào RAM, rồi chạy
+  tiếp từ `last.pt` (cuối epoch 4) với `data.features_in_memory=false`. Thay đổi được ghi là
+  `data.features_in_memory: True -> False`; nó chỉ đổi cách đọc cache, không đổi giá trị đặc
+  trưng.
+- `attention_clip_b16_seed43` bị script theo dõi RAM dừng hai lần, mỗi lần chạy tiếp từ `last.pt`
+  với cùng cấu hình.
+
+Cache đặc trưng đã được kiểm tra lại bằng mã đã commit: SigLIP trùng từng bit; CLIP trùng từng
+bit khi trích theo đúng các lô đã dùng, nhưng đặc trưng float16 của CLIP phụ thuộc cỡ lô
+(chi tiết trong [MODELS.md](MODELS.md)).

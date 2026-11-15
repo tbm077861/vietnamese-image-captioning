@@ -11,12 +11,12 @@ Trạng thái: ✅ xong · 🔄 đang làm · ⬜ chưa làm
 | 2 | Khảo sát và chọn dataset | ✅ |
 | 3 | Tiền xử lý tiếng Việt và pipeline dữ liệu | ✅ |
 | 4 | Mô hình baseline, huấn luyện, đánh giá, suy luận, kết quả baseline | ✅ |
-| 5 | Mô hình mạnh hơn: bước 1–4 của kế hoạch bên dưới | 🔄 bước 1–2 xong, kế tiếp là bước 3 |
+| 5 | Mô hình mạnh hơn: bước 1–4 của kế hoạch bên dưới | 🔄 bước 1–3 xong, kế tiếp là bước 4 |
 | 6 | Tinh chỉnh, tối ưu CIDEr, hướng tùy chọn: bước 5–7 | ⬜ |
 | 7 | Đánh giá tổng hợp và phân tích lỗi | ⬜ |
 | 8 | Demo Gradio và hoàn thiện README | ⬜ |
 
-**Việc kế tiếp: Bước 3 của Giai đoạn 5** (encoder CLIP và SigLIP). Bảng so sánh mọi run:
+**Việc kế tiếp: Bước 4 của Giai đoạn 5** (Transformer decoder). Bảng so sánh mọi run:
 [EXPERIMENTS.md](EXPERIMENTS.md).
 
 **Quy tắc đánh giá:** mọi lựa chọn mô hình, siêu tham số và cách giải mã chỉ dựa trên tập val.
@@ -135,13 +135,25 @@ Decoder mới trong `src/vic/models/decoder.py`, hiện thực bốn hàm `forwa
   thêm tùy chọn chặn lặp n-gram vì mô hình hay lặp cụm từ.
 - Chốt cách giải mã **trên val**, ghi vào `docs/EXPERIMENTS.md`. Không dùng test để chốt.
 
-### Bước 3 – Encoder mạnh hơn ⬜ (nhánh `feat/strong-encoders`)
+### Bước 3 – Encoder mạnh hơn ✅ (nhánh `feat/strong-encoders`)
+
+**Kết quả:** hai encoder `clip_vit_b16` (CLIP ViT-B/16, MIT) và `siglip_b16` (SigLIP ViT-B/16,
+Apache-2.0), giấy phép xác minh tại nguồn trong [MODELS.md](MODELS.md), đặc trưng là lưới 196
+vùng × 768 chiều. Với LSTM attention, CIDEr val (beam 3, ba seed) đạt 0,6512 ± 0,0046 (CLIP) và
+0,6570 ± 0,0058 (SigLIP), so với 0,4860 ± 0,0024 của ResNet-50: tăng khoảng 0,17, vượt xa mức
+nhiễu. CLIP và SigLIP chênh nhau trong mức nhiễu; **chọn SigLIP** vì trung bình cao hơn (cùng
+chiều: giấy phép Apache-2.0, đặc trưng không phụ thuộc cỡ lô). Decoder LSTM không attention chỉ
+tăng 0,03–0,06. Cấu hình CLIP / SigLIP đọc cache bằng memory-map
+(`data.features_in_memory: false`) vì nạp cả cache vào RAM làm máy gần hết bộ nhớ. Ngoài kế
+hoạch: `summary.json` ghi các lần chạy tiếp và ghi đè cấu hình; bảng thí nghiệm có thêm cột giải
+mã chốt cho mọi run (`src/vic/engine/protocol.py`). Chi tiết, RAM từng run:
+[EXPERIMENTS.md](EXPERIMENTS.md).
 
 - **Đúng hai ứng viên: một mô hình CLIP và một mô hình SigLIP.** Bỏ DINOv2.
 - **Giấy phép trọng số:** chỉ dùng trọng số có giấy phép cho phép nghiên cứu, ưu tiên MIT hoặc
   Apache-2.0. Phải xác minh tại nguồn (trang mô hình và file LICENSE của repo gốc) **trước khi
   tải**, rồi ghi vào `docs/MODELS.md`: tên mô hình, nguồn, câu giấy phép trích nguyên văn, ngày
-  kiểm tra. Hiện chưa mô hình nào được xác minh.
+  kiểm tra.
 - **Thư viện:** `open_clip_torch` hoặc `transformers`; kiểm tra tương thích với PyTorch 2.14.1,
   ghim phiên bản trong `requirements.txt`.
 - **Lưu đặc trưng dạng lưới patch** (không chỉ vector gộp) để attention và Transformer dùng được,
