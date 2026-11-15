@@ -9,6 +9,48 @@ không xuất hiện ở đây. Phần giữa hai dấu mốc bên dưới do `s
 | Run | Encoder | Decoder | Seed | CIDEr (beam 3) | BLEU-4 | CIDEr (greedy) | Câu khác nhau | Âm tiết khác nhau | Độ dài TB | Lặp 2-gram (%) | Lặp 3-gram (%) | Tham số (triệu) | Huấn luyện (phút) | VRAM đỉnh (MB) | Epoch tốt nhất | Commit | Ghi chú |
 |---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | `baseline_lstm` | resnet50 @224 | lstm | 42 | 0.4274 | 28.74 | 0.4232 | 975 | 357 | 14.3 | 15.8 | 8.8 | 7.77 | ~8.3 | 385 | 28 | — |  |
-| `baseline_lstm_seed43` | resnet50 @224 | lstm | 43 | — | — | — | — | — | — | — | — | 7.77 | — | — | — | — | **chưa có kết quả** |
+| `baseline_lstm_seed43` | resnet50 @224 | lstm | 43 | 0.4312 | 28.43 | 0.4304 | 1036 | 349 | 14.6 | 17.6 | 8.9 | 7.77 | 11.0 | 383 | 20 | `cb97a88` |  |
+| `baseline_lstm_seed44` | resnet50 @224 | lstm | 44 | 0.4010 | 27.22 | 0.4156 | 918 | 310 | 14.5 | 14.8 | 5.8 | 7.77 | 6.6 | 382 | 14 | `cb97a88` |  |
+
+Để so sánh, 10002 câu tham chiếu của tập val: 2358 âm tiết khác nhau, độ dài trung bình 18.6, lặp 2-gram 20.0%, lặp 3-gram 6.4%.
+
+### Độ nhiễu giữa các seed
+
+Trung bình ± độ lệch chuẩn mẫu của các run cùng cấu hình, chỉ khác seed (beam 3).
+
+| Cấu hình | Seed | CIDEr | BLEU-4 |
+|---|---|---:|---:|
+| `baseline_lstm` | 42, 43, 44 | 0.4199 ± 0.0164 | 28.13 ± 0.80 |
 
 <!-- experiments:end -->
+
+## Cách đọc bảng
+
+- **CIDEr (beam 3)** là chỉ số so sánh chính, **BLEU-4** là phụ; CIDEr theo thang gốc 0–10, BLEU
+  nhân 100. Cột greedy để theo dõi ảnh hưởng của cách giải mã.
+- Bốn cột canh độ tự nhiên tính trên caption sinh ra cho 2.011 ảnh val (beam 3): số câu khác
+  nhau, số âm tiết khác nhau, độ dài trung bình (âm tiết), tỉ lệ câu có cụm 2 hoặc 3 âm tiết
+  xuất hiện hơn một lần. Chúng không phải điểm chất lượng: so với dòng "câu tham chiếu" ngay
+  dưới bảng, không so với 0. Người viết cũng lặp cụm 2 âm tiết một cách hợp lệ ("một người …
+  một người").
+- Thời gian có dấu `~` là ước lượng từ thời gian mỗi epoch (run cũ chưa ghi tổng thời gian).
+  Thời gian của `baseline_lstm_seed43` gồm cả một lần bị ngắt rồi chạy tiếp.
+- Run tên `<tên>_seed<N>` là cùng cấu hình `<tên>` với seed khác.
+
+## Ghi chú
+
+### Độ nhiễu của baseline (Bước 1)
+
+- Ba seed (42, 43, 44) cho CIDEr val 0,4199 ± 0,0164 và BLEU-4 28,13 ± 0,80 (beam 3). Theo quy
+  tắc trong `ROADMAP.md`, một chênh lệch chỉ được coi là thật khi vượt hai lần độ lệch chuẩn,
+  tức **khoảng 0,033 CIDEr** với mức nhiễu này, và vượt 0,01.
+- Một phần nhiễu đến từ dừng sớm: seed 42 chạy đủ 30 epoch (tốt nhất ở epoch 28), seed 43 dừng
+  ở epoch 25 (tốt nhất 20), seed 44 dừng ở epoch 19 (tốt nhất 14) và cũng là seed thấp điểm
+  nhất. CIDEr val dao động 0,01–0,02 giữa các epoch liền nhau nên ngưỡng kiên nhẫn 5 epoch có
+  thể dừng trước khi mô hình hội tụ. Cấu hình baseline được giữ nguyên để làm mốc; việc nới
+  ngưỡng kiên nhẫn là một yếu tố để thử ở lượt tinh chỉnh.
+- Beam 3 không hơn greedy một cách ổn định: hơn ở seed 42 và 43, kém ở seed 44. Cách giải mã
+  được xem xét riêng ở Bước 2.
+- Chỉ số lặp cụm mới bắt được lỗi mà chỉ số cũ ("âm tiết lặp liền nhau", bằng 0) bỏ sót:
+  5,8–8,9% câu của baseline có cụm 3 âm tiết lặp lại, ngang hoặc cao hơn câu tham chiếu (6,4%)
+  dù câu sinh ra ngắn hơn nhiều (14,3–14,6 so với 18,6 âm tiết).

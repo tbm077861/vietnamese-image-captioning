@@ -27,6 +27,7 @@ def set_seed(seed: int, deterministic: bool = False) -> None:
 def git_commit() -> str | None:
     """Short hash of the checked-out commit, with "-dirty" when tracked files are modified.
 
+    Documentation is ignored (the experiment table is rewritten after every run of a sweep).
     Returns None outside a git checkout or when git is unavailable.
     """
     try:
@@ -34,7 +35,7 @@ def git_commit() -> str | None:
             ["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, check=True
         ).stdout.strip()
         status = subprocess.run(
-            ["git", "status", "--porcelain", "--untracked-files=no"],
+            ["git", "status", "--porcelain", "--untracked-files=no", "--", ".", ":(exclude)*.md"],
             capture_output=True, text=True, check=True,
         ).stdout.strip()  # fmt: skip
     except (OSError, subprocess.CalledProcessError):
