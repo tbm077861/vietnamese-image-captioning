@@ -1,29 +1,53 @@
-"""Run a list of experiment configs one after another, unattended.
+"""Run a list of experiment configs one after another, unattended, one process per run.
 
 For every config: train (finished runs are skipped, unfinished ones resume from ``last.pt``),
 evaluate ``best.pt`` on the validation split with each requested beam size under the comparison
-decoding and once with the chosen decoding (``vic.engine.protocol``), then refresh the
-experiment table. Missing evaluations of finished runs are added. A run that fails is recorded
-and the sweep moves on to the next one; calling the sweep again retries it. The test split is
-never touched.
+decoding and once with the chosen decoding (``vic.engine.protocol``). Missing evaluations of
+finished runs are added. The test split is never touched.
+
+Every run happens in its own child process (``python -I -X utf8 -m vic.engine.sweep ...``): the
+memory of a run goes back to the system before the next one starts, and a crash or a killed
+process costs that run only. The parent plans the runs, starts the children one at a time and
+collects their results; it never imports PyTorch.
+
+A child refuses to start (exit code 3) unless its results can be tied to one commit: it must be
+started inside the git checkout its code comes from, and that checkout must be clean
+(``vic.utils.worktree_problem``). The sweep stops at the first refusal. A run that fails is
+recorded and the sweep moves on; calling the sweep again retries it. The experiment table is
+refreshed once, after the last run, so the working tree stays clean while runs are in progress.
 """
 
 from __future__ import annotations
 
+import argparse
 import copy
-import gc
+import subprocess
+import sys
+import tempfile
 import traceback
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
-import torch
-
 from vic.config import load_config, save_yaml
-from vic.engine.evaluation import evaluate_checkpoint
 from vic.engine.experiments import run_status, update_experiments_doc
 from vic.engine.protocol import CHOSEN_DECODING, PROTOCOL_DECODING, evaluation_filename
-from vic.engine.trainer import run_training
-from vic.utils import git_commit, read_json, setup_logging, write_json
+from vic.utils import git_commit, read_json, setup_logging, worktree_problem, write_json
+
+REFUSED_EXIT_CODE = 3
+
+
+@dataclass(frozen=True)
+class PlannedRun:
+    """One run of a sweep: the config file, the seed and the resulting config."""
+
+    config_path: Path
+    seed: int
+    config: dict
+
+    @property
+    def name(self) -> str:
+        return self.config["run_name"]
 
 
 def expand_config_paths(paths: Sequence[str | Path]) -> list[Path]:
@@ -39,17 +63,17 @@ def expand_config_paths(paths: Sequence[str | Path]) -> list[Path]:
     return expanded
 
 
-def sweep_configs(
+def plan_runs(
     paths: Sequence[str | Path],
     seeds: Sequence[int] | None = None,
     overrides: list[str] | None = None,
-) -> list[dict]:
-    """Load every config; with ``seeds``, one copy per seed.
+) -> list[PlannedRun]:
+    """Load every config; with ``seeds``, one run per seed.
 
-    The copy whose seed equals the config's own seed keeps the config's ``run_name``; the others
+    The run whose seed equals the config's own seed keeps the config's ``run_name``; the others
     are named ``<run_name>_seed<N>``, which is how the experiment table groups seeds.
     """
-    configs = []
+    runs = []
     for path in expand_config_paths(paths):
         base = load_config(path, overrides)
         if overrides:
@@ -60,15 +84,104 @@ def sweep_configs(
             if int(seed) != own_seed:
                 config["seed"] = int(seed)
                 config["run_name"] = f"{base['run_name']}_seed{int(seed)}"
-            configs.append(config)
-    names = [config["run_name"] for config in configs]
+            runs.append(PlannedRun(path, int(seed), config))
+    names = [run.name for run in runs]
     duplicates = sorted({name for name in names if names.count(name) > 1})
     if duplicates:
         raise ValueError(f"Several configs share a run_name: {duplicates}")
-    return configs
+    return runs
 
 
-def _run_one(config: dict, beam_sizes: Sequence[int], overrides: list[str] | None) -> dict:
+def sweep_configs(
+    paths: Sequence[str | Path],
+    seeds: Sequence[int] | None = None,
+    overrides: list[str] | None = None,
+) -> list[dict]:
+    """The configs of ``plan_runs``."""
+    return [run.config for run in plan_runs(paths, seeds, overrides)]
+
+
+def child_command(
+    run: PlannedRun,
+    beam_sizes: Sequence[int],
+    overrides: list[str] | None,
+    result_path: str | Path,
+) -> list[str]:
+    """Command line of the child process that trains and evaluates ``run``."""
+    command = [
+        sys.executable, "-I", "-X", "utf8", "-m", "vic.engine.sweep",
+        "--config", str(run.config_path), "--seed", str(run.seed),
+        "--result", str(result_path), "--beam-size", *map(str, beam_sizes),
+    ]  # fmt: skip
+    if overrides:
+        command += ["--set", *overrides]
+    return command
+
+
+def _launch_process(command: list[str]) -> int:
+    """Run a child with this process's console and output; return its exit code."""
+    return subprocess.run(command, check=False).returncode
+
+
+def run_sweep(
+    paths: Sequence[str | Path],
+    seeds: Sequence[int] | None = None,
+    beam_sizes: Sequence[int] = (1, 3),
+    overrides: list[str] | None = None,
+    doc_path: str | Path | None = "docs/EXPERIMENTS.md",
+    launch: Callable[[list[str]], int] | None = None,
+) -> list[dict]:
+    """Run every config in a child process; return one entry per started run.
+
+    Each entry has the run name, its status ("completed", "skipped", "failed" or "refused"), its
+    validation CIDEr per decoding and the error, if any. ``launch`` runs a child command and
+    returns its exit code (tests replace it).
+    """
+    runs = plan_runs(paths, seeds, overrides)
+    launch = launch or _launch_process
+    table_beam = 3 if 3 in beam_sizes else max(beam_sizes)  # main columns of the table
+    results: list[dict] = []
+    logger = setup_logging()
+    with tempfile.TemporaryDirectory(prefix="vic_sweep_") as scratch:
+        for position, run in enumerate(runs, start=1):
+            logger.info(f"=== [{position}/{len(runs)}] {run.name} ===")
+            result_path = Path(scratch) / f"run{position}.json"
+            code = launch(child_command(run, beam_sizes, overrides, result_path))
+            logger = setup_logging()  # the child may have written to the same console
+            entry = {"run": run.name, "status": "failed", "cider": {}, "error": None}
+            if result_path.exists():
+                entry.update(read_json(result_path))
+            else:
+                entry["error"] = f"the child process ended with exit code {code} and no result"
+            results.append(entry)
+            if entry["status"] == "refused":
+                logger.error(f"Sweep stopped, {run.name} refused to start: {entry['error']}")
+                break
+
+    started = [entry for entry in results if entry["status"] != "refused"]
+    if doc_path is not None and started:
+        output_dir = runs[len(results) - 1].config.get("output_dir", "outputs")
+        try:
+            update_experiments_doc(output_dir, doc_path, table_beam)
+        except Exception as error:
+            logger.error(f"Could not update {doc_path}: {error}")
+
+    logger.info("=== Sweep finished ===")
+    for entry in results:
+        cider = ", ".join(f"{k}: {v:.4f}" for k, v in entry["cider"].items())
+        logger.info(f"{entry['run']}: {entry['status']} {cider}{entry['error'] or ''}")
+    if len(results) < len(runs):
+        logger.info(f"{len(runs) - len(results)} run(s) not started")
+    return results
+
+
+# --- child process ------------------------------------------------------------------------------
+
+
+def _train_and_evaluate(config: dict, beam_sizes: Sequence[int], overrides: list[str] | None):
+    from vic.engine.evaluation import evaluate_checkpoint
+    from vic.engine.trainer import run_training
+
     run_dir = Path(config.get("output_dir", "outputs")) / config["run_name"]
     summary_path = run_dir / "summary.json"
     summary = read_json(summary_path) if summary_path.exists() else None
@@ -89,46 +202,16 @@ def _run_one(config: dict, beam_sizes: Sequence[int], overrides: list[str] | Non
     return {"status": "completed" if trained else "skipped", "cider": scores}
 
 
-def run_sweep(
-    paths: Sequence[str | Path],
-    seeds: Sequence[int] | None = None,
-    beam_sizes: Sequence[int] = (1, 3),
-    overrides: list[str] | None = None,
-    doc_path: str | Path | None = "docs/EXPERIMENTS.md",
-) -> list[dict]:
-    """Run every config; return one entry per run with its status and validation CIDEr."""
-    configs = sweep_configs(paths, seeds, overrides)
-    table_beam = 3 if 3 in beam_sizes else max(beam_sizes)  # main columns of the table
-    results = []
-    for position, config in enumerate(configs, start=1):
-        name = config["run_name"]
-        logger = setup_logging()
-        logger.info(f"=== [{position}/{len(configs)}] {name} ===")
-        entry = {"run": name, "status": "failed", "cider": {}, "error": None}
-        try:
-            entry.update(_run_one(config, beam_sizes, overrides))
-        except Exception as error:  # one broken run must not stop the sweep
-            entry["error"] = f"{type(error).__name__}: {error}"
-            logger = setup_logging()
-            logger.error(f"Run {name} failed:\n{traceback.format_exc()}")
-            _record_failure(config, entry["error"])
-        finally:
-            gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-        results.append(entry)
-        if doc_path is not None:
-            try:
-                update_experiments_doc(config.get("output_dir", "outputs"), doc_path, table_beam)
-            except Exception as error:
-                setup_logging().error(f"Could not update {doc_path}: {error}")
-
-    logger = setup_logging()
-    logger.info("=== Sweep finished ===")
-    for entry in results:
-        cider = ", ".join(f"{k}: {v:.4f}" for k, v in entry["cider"].items())
-        logger.info(f"{entry['run']}: {entry['status']} {cider}{entry['error'] or ''}")
-    return results
+def run_one(config: dict, beam_sizes: Sequence[int], overrides: list[str] | None) -> dict:
+    """Train (unless finished) and evaluate one run in this process; failures are returned."""
+    entry = {"status": "failed", "cider": {}, "error": None}
+    try:
+        entry.update(_train_and_evaluate(config, beam_sizes, overrides))
+    except Exception as error:
+        entry["error"] = f"{type(error).__name__}: {error}"
+        setup_logging().error(f"Run {config['run_name']} failed:\n{traceback.format_exc()}")
+        _record_failure(config, entry["error"])
+    return entry
 
 
 def _record_failure(config: dict, error: str) -> None:
@@ -155,3 +238,29 @@ def _record_failure(config: dict, error: str) -> None:
         }
     )
     write_json(summary, summary_path, indent=2)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Child process: one run of a sweep. Writes its result to ``--result``; see the module doc."""
+    parser = argparse.ArgumentParser(description="Train and evaluate one run of a sweep")
+    parser.add_argument("--config", required=True, help="experiment YAML file")
+    parser.add_argument("--seed", type=int, required=True)
+    parser.add_argument("--result", required=True, help="JSON file that receives the result")
+    parser.add_argument("--beam-size", nargs="+", type=int, default=[1, 3])
+    parser.add_argument("--set", nargs="+", default=None, metavar="KEY=VALUE")
+    args = parser.parse_args(argv)
+
+    problem = worktree_problem()  # before anything heavy is loaded
+    if problem is not None:
+        error = f"refused to run: {problem}"
+        write_json({"status": "refused", "cider": {}, "error": error}, args.result)
+        print(error, file=sys.stderr)
+        return REFUSED_EXIT_CODE
+    (run,) = plan_runs([args.config], [args.seed], args.set)
+    entry = run_one(run.config, args.beam_size, args.set)
+    write_json(entry, args.result)
+    return 1 if entry["status"] == "failed" else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

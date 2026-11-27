@@ -13,6 +13,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]  # test the checkout's own code (also in a git worktree)
 addopts = "-q"
 
 [tool.ruff]

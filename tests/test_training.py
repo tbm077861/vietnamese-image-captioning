@@ -11,6 +11,7 @@ from vic.config import data_paths, save_yaml
 from vic.data.annotations import make_record
 from vic.data.features import FeatureStore, create_feature_cache, write_feature_index
 from vic.data.prepare import build_vocabulary, tokenize_records
+from vic.engine import sweep
 from vic.engine.checkpoint import load_checkpoint, model_from_checkpoint
 from vic.engine.data import load_experiment_data, make_image_loader
 from vic.engine.evaluation import (
@@ -277,7 +278,20 @@ def test_init_from_copies_weights_but_not_progress(toy_config):
         assert torch.equal(tensor, started["decoder"][name]), name
 
 
-def test_sweep_runs_seeds_skips_finished_and_survives_failures(toy_config, tmp_path):
+def _in_process(launched: list, before=None):
+    """Launcher running each sweep child inside the test process, so the code under test runs."""
+
+    def launch(command: list[str]) -> int:
+        if before is not None:
+            before()
+        launched.append(command)
+        return sweep.main(command[command.index("vic.engine.sweep") + 1 :])
+
+    return launch
+
+
+def test_sweep_runs_seeds_skips_finished_and_survives_failures(toy_config, tmp_path, monkeypatch):
+    monkeypatch.setattr(sweep, "worktree_problem", lambda: None)  # tmp_path is not a checkout
     good = tmp_path / "good.yaml"
     save_yaml(toy_config, good)
     broken_config = copy.deepcopy(toy_config)
@@ -289,10 +303,19 @@ def test_sweep_runs_seeds_skips_finished_and_survives_failures(toy_config, tmp_p
     lines = ["# Title", "", BEGIN_MARKER, "old", END_MARKER, "", "Keep me.", ""]
     doc.write_text("\n".join(lines), encoding="utf-8")
 
+    def table_untouched() -> None:  # the table is refreshed once, after the last run
+        assert "old" in doc.read_text(encoding="utf-8")
+
+    launched = []
     results = run_sweep(
         [broken, good], seeds=[0, 1], beam_sizes=(1, 2), overrides=["eval.batch_size=8"],
-        doc_path=doc,
+        doc_path=doc, launch=_in_process(launched, table_untouched),
     )  # fmt: skip
+    assert len(launched) == 4  # one child process per run
+    for command in launched:
+        assert command[1:6] == ["-I", "-X", "utf8", "-m", "vic.engine.sweep"]
+        assert command[command.index("--set") + 1 :] == ["eval.batch_size=8"]
+    assert [command[command.index("--seed") + 1] for command in launched] == ["0", "1"] * 2
     by_run = {entry["run"]: entry for entry in results}
     assert set(by_run) == {"broken", "broken_seed1", "tiny", "tiny_seed1"}
     assert by_run["broken"]["status"] == "failed" and "does_not_exist" in by_run["broken"]["error"]
@@ -313,9 +336,26 @@ def test_sweep_runs_seeds_skips_finished_and_survives_failures(toy_config, tmp_p
     assert rows["tiny"]["cider_chosen"] is not None and "giải mã chốt" in text
     assert rows["broken"]["status"] == "failed" and rows["broken"]["cider"] is None
 
-    again = run_sweep([good], seeds=[0, 1], beam_sizes=(1, 2), doc_path=None)
+    again = run_sweep(
+        [good], seeds=[0, 1], beam_sizes=(1, 2), doc_path=None, launch=_in_process([])
+    )
     assert [entry["status"] for entry in again] == ["skipped", "skipped"]
     assert again[0]["cider"] == by_run["tiny"]["cider"]
+
+
+def test_sweep_stops_at_the_first_child_that_refuses_to_run(toy_config, tmp_path, monkeypatch):
+    problem = "the working tree of /repo is not clean (M src/vic/models/decoder.py); commit first"
+    monkeypatch.setattr(sweep, "worktree_problem", lambda: problem)
+    config_path = tmp_path / "good.yaml"
+    save_yaml(toy_config, config_path)
+    doc = tmp_path / "EXPERIMENTS.md"
+    launched = []
+    results = run_sweep(
+        [config_path], seeds=[0, 1, 2], beam_sizes=(2,), doc_path=doc, launch=_in_process(launched)
+    )
+    assert len(launched) == 1 and [entry["status"] for entry in results] == ["refused"]
+    assert results[0]["run"] == "tiny" and "not clean" in results[0]["error"]
+    assert not doc.exists() and not _outputs(toy_config).exists()  # nothing ran, nothing written
 
 
 def test_experiments_doc_is_created_and_comparison_uses_fixed_images(toy_config, tmp_path):

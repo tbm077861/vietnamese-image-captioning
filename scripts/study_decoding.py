@@ -2,7 +2,7 @@
 
 Usage:
     python scripts/study_decoding.py --checkpoint outputs/baseline_lstm/checkpoints/best.pt
-    python scripts/study_decoding.py --checkpoint <ckpt> --beam-size 1 3 5 --no-repeat 0 3
+    python scripts/study_decoding.py --checkpoint <ckpt> --beam-size 1 3 5 --no-repeat 0 2 3
 
 Every combination of --beam-size, --beam-stop, --length-penalty and --no-repeat is decoded and
 scored (greedy ignores the length penalty and the stopping rule, so it runs once per --no-repeat
@@ -20,7 +20,7 @@ from vic.engine.evaluation import study_decoding
 
 HEADER = (
     "| Beam | Dừng | Length penalty | Chặn lặp | CIDEr | BLEU-4 | Độ dài TB | Câu khác nhau "
-    "| Âm tiết khác nhau | Lặp 3-gram (%) |"
+    "| Âm tiết khác nhau | Lặp 2-gram (%) | Lặp 3-gram (%) |"
 )
 
 
@@ -32,7 +32,8 @@ def format_row(row: dict) -> str:
         f"| {'—' if greedy else row['length_penalty']} | {row['no_repeat_ngram_size'] or '—'} "
         f"| {row['scores']['CIDEr']:.4f} | {row['scores']['BLEU-4'] * 100:.2f} "
         f"| {stats['mean_length']:.1f} | {stats['distinct_captions']} "
-        f"| {stats['distinct_tokens']} | {100 * stats['repeated_trigram_rate']:.1f} |"
+        f"| {stats['distinct_tokens']} | {100 * stats['repeated_bigram_rate']:.1f} "
+        f"| {100 * stats['repeated_trigram_rate']:.1f} |"
     )
 
 
@@ -66,7 +67,7 @@ def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     print(HEADER)
-    print("|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|")
+    print("|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
     for row in rows:
         print(format_row(row))
 
