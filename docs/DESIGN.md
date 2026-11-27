@@ -119,6 +119,22 @@ Huấn luyện đọc từ cache (`data.use_cached_features: true`): không cầ
 epoch chỉ mất vài giây. Hạn chế: không tăng cường ảnh được, và phải trích lại khi đổi encoder
 hay kích thước ảnh (cache mới nằm ở thư mục khác, không ghi đè).
 
+Có ba cách đọc cache, cho cùng giá trị (có test kiểm tra rằng huấn luyện cho trọng số giống hệt):
+
+- `data.features_in_memory: true`: nạp cả mảng vào RAM;
+- `data.feature_access: mmap` (mặc định): ánh xạ file vào bộ nhớ. Các hàng đã đọc nằm lại trong
+  working set của tiến trình, nên sau một epoch tiến trình giữ cả phần train của cache (khoảng
+  2,5 GB với SigLIP);
+- `data.feature_access: read`: mỗi hàng được đọc bằng một lệnh đọc file thường. Hệ điều hành
+  giữ file trong bộ đệm mà nó thu hồi được bất cứ lúc nào (tính là RAM trống), nên tiến trình
+  nhỏ. Dùng khi máy thiếu RAM.
+
+Phía CPU của vòng huấn luyện chỉ chép dữ liệu (đọc hàng, ghép lô); mọi phép tính nặng chạy trên
+GPU. Với nhiều luồng OpenMP (mặc định của PyTorch), các luồng rảnh quay chờ sau mỗi phép song
+song và làm chậm chính các thao tác chép đó. Đặt `OMP_NUM_THREADS=1` khi chạy giảm thời gian nạp
+một lô 128 cặp của `attention_siglip_b16` từ khoảng 180 ms xuống 32 ms (đo trên máy phát triển,
+32 luồng logic). `summary.json` ghi số luồng thực tế (`cpu_threads`).
+
 Đường chạy trực tiếp vẫn giữ: đặt `data.use_cached_features=false` thì dataset trả ảnh và mô
 hình tự chạy encoder; thêm `model.encoder.trainable=true` để fine-tune (encoder dùng learning
 rate riêng `train.encoder_lr`, và trọng số encoder khi đó được lưu vào checkpoint).
