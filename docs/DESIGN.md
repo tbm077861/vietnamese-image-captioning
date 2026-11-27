@@ -15,7 +15,8 @@ extract_features.py  data/features/<dataset>/<encoder>_<size>/features.npy + ind
 train.py             outputs/<run>/checkpoints/{last,best}.pt, metrics.jsonl, train.log
 evaluate.py          outputs/<run>/eval_<split>_beam<k>.json
 predict.py           caption cho ảnh bất kỳ
-run_sweep.py         train + evaluate (val) cho nhiều cấu hình, cập nhật docs/EXPERIMENTS.md
+run_sweep.py         train + evaluate (val) cho nhiều cấu hình, mỗi run một tiến trình; cập nhật
+                     docs/EXPERIMENTS.md
 ```
 
 Mỗi bước chỉ đọc kết quả của bước trước, nên có thể chạy lại riêng từng bước. Thư mục kết quả
@@ -144,6 +145,11 @@ rate riêng `train.encoder_lr`, và trọng số encoder khi đó được lưu 
   `failed` kèm thông báo lỗi), commit git, seed, số tham số, tổng thời gian huấn luyện (cộng dồn
   qua các lần resume), epoch tốt nhất, VRAM đỉnh. `run_sweep.py` dựa vào `status` để bỏ qua run
   đã xong và chạy tiếp run dở.
+- **Mỗi run một tiến trình, chỉ trên checkout sạch:** `run_sweep.py` là tiến trình cha mỏng (không
+  nạp PyTorch), chạy từng run trong một tiến trình con. Tiến trình con kiểm tra trước tiên rằng
+  nó chạy trong bản checkout chứa code của gói `vic` và cây làm việc sạch
+  (`vic.utils.worktree_problem`). Nếu không, nó từ chối với mã thoát 3, nên mọi kết quả của lượt
+  quét gắn với một commit.
 
 Ngân sách VRAM: hệ điều hành chiếm khoảng 1,5 GB trong 8 GB. Số đo khi chạy thử: huấn luyện từ
 cache dùng đỉnh 385 MB (batch 128); chạy encoder đóng băng trực tiếp trên ảnh dùng đỉnh 486 MB

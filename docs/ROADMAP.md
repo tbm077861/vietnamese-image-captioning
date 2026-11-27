@@ -11,14 +11,13 @@ Trạng thái: ✅ xong · 🔄 đang làm · ⬜ chưa làm
 | 2 | Khảo sát và chọn dataset | ✅ |
 | 3 | Tiền xử lý tiếng Việt và pipeline dữ liệu | ✅ |
 | 4 | Mô hình baseline, huấn luyện, đánh giá, suy luận, kết quả baseline | ✅ |
-| 5 | Mô hình mạnh hơn: bước 1–4 của kế hoạch bên dưới | ✅ bước 1–4 xong, chờ duyệt bước 5–7 |
-| 6 | Tinh chỉnh, tối ưu CIDEr, hướng tùy chọn: bước 5–7 | ⬜ |
+| 5 | Mô hình mạnh hơn: bước 1–4 của kế hoạch bên dưới | ✅ |
+| 6 | Tinh chỉnh, tối ưu CIDEr, hướng tùy chọn: bước 5–7 | 🔄 bước 5–6 đang làm |
 | 7 | Đánh giá tổng hợp và phân tích lỗi | ⬜ |
 | 8 | Demo Gradio và hoàn thiện README | ⬜ |
 
-**Việc kế tiếp:** chủ dự án đọc báo cáo sau Bước 4 và duyệt Bước 5–7; trước Bước 5 làm hai việc
-trong mục "Việc phải làm trước Bước 5". Bảng so sánh mọi run:
-[EXPERIMENTS.md](EXPERIMENTS.md).
+**Việc kế tiếp:** làm năm việc của mục "Bước 5–6: phạm vi đã duyệt (28/11/2026)" bên dưới, rồi
+dừng và báo cáo. Bảng so sánh mọi run: [EXPERIMENTS.md](EXPERIMENTS.md).
 
 **Quy tắc đánh giá:** mọi lựa chọn mô hình, siêu tham số và cách giải mã chỉ dựa trên tập val.
 Tập test chỉ được dùng thêm một lần, để báo cáo mô hình cuối cùng.
@@ -207,22 +206,46 @@ Báo cáo gửi chủ dự án phải có:
 
 ### Việc phải làm trước Bước 5
 
-Phát hiện trong Bước 3; làm xong trước khi chạy lượt quét cấu hình:
+Phát hiện trong Bước 3:
 
-1. **Tách tiến trình cho mỗi run** trong `scripts/run_sweep.py`. Hiện mọi cấu hình chạy nối tiếp
-   trong cùng một tiến trình Python; bộ nhớ của run trước có thể chưa được trả hết khi run sau
-   nạp cache 3,67 GB. Một lượt chạy Bước 3 đã bị dừng vì máy gần hết RAM.
-2. **Cho encoder ViT chạy float32 khi trích cache và khi suy luận.** Đặc trưng CLIP tính ở
-   float16 phụ thuộc cỡ lô (lệch khoảng 0,5% theo L2), nên đặc trưng lúc `predict.py` chạy từng
-   ảnh hơi khác cache dùng để huấn luyện. Chi tiết: [MODELS.md](MODELS.md). Phải trích lại cache
-   và huấn luyện lại mô hình được chọn sau khi đổi.
+1. ✅ **Tách tiến trình cho mỗi run** trong `scripts/run_sweep.py`. Trước đây mọi cấu hình chạy
+   nối tiếp trong cùng một tiến trình Python. Nay mỗi run có tiến trình riêng, và tiến trình đó
+   từ chối chạy nếu repo không phải bản checkout sạch.
+2. **Cho encoder ViT chạy float32** khi trích cache và khi suy luận: chuyển sang Bước 7 (tùy
+   chọn). Chủ dự án quyết định giữ cache float16 hiện có. Đặc trưng CLIP tính ở float16 phụ
+   thuộc cỡ lô (lệch khoảng 0,5% theo L2); SigLIP thì không (chi tiết: [MODELS.md](MODELS.md)).
 
-### Bước 5 – Tinh chỉnh ⬜ (chưa được duyệt chạy)
+### Bước 5–6: phạm vi đã duyệt (28/11/2026)
+
+- **Mô hình nền:** LSTM attention + SigLIP ViT-B/16 (`attention_siglip_b16`), giữ cache float16.
+- **Cách chạy:** mọi lượt huấn luyện chạy nền, có đo RAM, dừng khi RAM trống dưới 1,0 GB. Không
+  bao giờ chạy hai tiến trình huấn luyện cùng lúc. Không chạy gì trên tập test.
+
+Năm việc, theo thứ tự:
+
+1. Tách tiến trình cho mỗi run trong `run_sweep.py`, kèm kiểm tra cây làm việc sạch; có test.
+2. Chạy seed 43 và 44 cho `transformer_siglip_b16_dropout03`; chọn decoder theo trung bình CIDEr
+   val beam 3 của ba seed.
+3. Lượt quét Bước 5 (`configs/sweeps/`), chạy từ repo chính ở một commit sạch, đọc kết quả theo
+   luật ghi trong [EXPERIMENTS.md](EXPERIMENTS.md), mục "Tinh chỉnh (Bước 5)".
+4. SCST (Bước 6), viết trong một git worktree riêng trong lúc lượt quét chạy, và không sửa repo
+   chính khi lượt quét đang chạy. Chỉ chạy thử ngắn, sau khi lượt quét xong.
+5. Dừng và báo cáo. Báo cáo gồm:
+   - bảng Bước 5;
+   - ba seed của Transformer;
+   - cấu hình thắng và kết quả `study_decoding`;
+   - kết quả chạy thử SCST kèm 10 ảnh mẫu;
+   - các ngưỡng độ tự nhiên đề xuất;
+   - số liệu RAM.
+
+Chưa chạy SCST đầy đủ và chưa chạy tập test cho tới khi chủ dự án duyệt.
+
+### Bước 5 – Tinh chỉnh 🔄
 
 Trên cặp encoder – decoder tốt nhất, tối đa 15 run, mỗi run đổi một yếu tố: label smoothing (0 và
 0,1), dropout, learning rate, số lớp và độ rộng, mức từ hay âm tiết, `text.min_freq` (đổi thì phải
-chạy lại `prepare_data.py`), và cách giải mã (beam, length penalty, chặn lặp). Chủ dự án tự chạy
-bằng `scripts/run_sweep.py` với danh sách đã chuẩn bị ở cuối Bước 4.
+chạy lại `prepare_data.py`), và cách giải mã (beam, length penalty, chặn lặp). Chạy bằng
+`scripts/run_sweep.py` với danh sách đã chuẩn bị ở cuối Bước 4.
 
 **Danh sách đã chuẩn bị** (`configs/sweeps/`, gốc là `attention_siglip_b16`, CIDEr val
 0,6570 ± 0,0058): 10 run seed 42, mỗi run đổi một yếu tố so với gốc.
@@ -246,23 +269,43 @@ bằng `scripts/run_sweep.py` với danh sách đã chuẩn bị ở cuối Bư�
 - Run 9 và 10 cần chuẩn bị dữ liệu một lần trước (lệnh ghi ở đầu mỗi file cấu hình):
   `python -I scripts/prepare_data.py --config configs/sweeps/09_attention_siglip_b16_syllable.yaml`
   và tương tự với file `10_...`. Thiếu bước này thì run đó báo lỗi, các run khác vẫn chạy.
+  Dữ liệu ghi vào thư mục riêng (`syllable_minfreq3/`, `word_minfreq5/`), không ghi đè dữ liệu
+  của các run khác.
 - Lệnh chạy cả danh sách: `python -I -X utf8 scripts/run_sweep.py configs/sweeps`. Ngân sách 15
-  run còn 5: bốn run dành cho seed 43 và 44 của hai cấu hình tốt nhất (chạy lại riêng hai file
-  đó với `--seeds 42 43 44`; seed 42 đã xong sẽ được bỏ qua).
-- Một chênh lệch chỉ được coi là thật khi vượt hai lần độ lệch chuẩn và vượt 0,01 CIDEr.
+  run còn 5, dành cho bước xác nhận.
+- **Luật đọc kết quả**, ghi trước khi chạy trong [EXPERIMENTS.md](EXPERIMENTS.md):
+  - so cặp với `attention_siglip_b16` seed 42;
+  - ngưỡng đáng xác nhận là +0,012 CIDEr beam 3, bằng hai lần độ lệch chuẩn giữa các seed của
+    chính cấu hình này;
+  - một thay đổi vượt ngưỡng thì chạy seed 43/44 cho nó;
+  - từ hai thay đổi trở lên thì chạy seed 43/44 cho thay đổi tốt nhất, cộng một cấu hình gộp hai
+    thay đổi tốt nhất với ba seed;
+  - không thay đổi nào vượt ngưỡng thì giữ cấu hình gốc;
+  - mô hình thắng chọn theo trung bình ba seed, rồi chạy `study_decoding.py` (thêm chặn lặp
+    2-gram).
 
-### Bước 6 – Tối ưu CIDEr kiểu SCST ⬜ (chưa được duyệt chạy)
+### Bước 6 – Tối ưu CIDEr kiểu SCST 🔄 (viết code và chạy thử; chạy đầy đủ chờ duyệt)
 
 - Bắt đầu từ checkpoint tốt nhất huấn luyện bằng cross-entropy (`--init-from`), learning rate
-  thấp; phần thưởng là CIDEr của câu lấy mẫu trừ CIDEr của câu greedy, tính với câu tham chiếu và
-  tần suất văn bản của tập train. Cần thêm đường giải mã lấy mẫu cho decoder và một bản CIDEr
-  nhận tần suất văn bản từ ngoài.
+  thấp; phần thưởng là CIDEr-D của câu lấy mẫu trừ CIDEr-D của câu greedy, tính với câu tham
+  chiếu và tần suất văn bản của tập train. Cần thêm đường giải mã lấy mẫu cho decoder và một bản
+  CIDEr nhận tần suất văn bản từ ngoài. Cách đánh giá trên val giữ nguyên.
+- Ghi các chỉ số độ tự nhiên theo từng epoch:
+  - số câu khác nhau và số âm tiết khác nhau;
+  - độ dài trung bình;
+  - tỷ lệ câu lặp 2-gram và lặp 3-gram;
+  - tỷ lệ câu kết thúc bằng hư từ ("và", "của", "với", "một", "có"…).
+- Đề xuất ngưỡng chặn cho các chỉ số đó; kết quả SCST chỉ tính là cải thiện khi không vi phạm
+  ngưỡng. Chủ dự án duyệt ngưỡng trước khi chạy đầy đủ.
+- Chạy thử ngắn từ checkpoint `attention_siglip_b16` seed 44, sau khi lượt quét Bước 5 xong.
 - **Tiêu chí đã duyệt:** bản SCST phải qua kiểm tra độ tự nhiên (các chỉ số canh ở Bước 1 và bộ
   50 ảnh val đọc bằng mắt không tệ hơn bản cross-entropy). Nếu không qua, mô hình cuối là bản
   cross-entropy và số SCST chỉ được báo cáo như một phép so sánh.
 
 ### Bước 7 – Hướng tùy chọn ⬜ (quyết định sau)
 
+- Cho encoder ViT chạy float32 khi trích cache và khi suy luận (chuyển từ "Việc phải làm trước
+  Bước 5"). Phải trích lại cache và huấn luyện lại mô hình được chọn sau khi đổi.
 - Decoder tiếng Việt pretrained (cỡ BARTpho hoặc GPT-2 tiếng Việt nhỏ; mô hình hàng tỉ tham số
   không huấn luyện được trong 6 GB). Giấy phép phải xác minh như ở Bước 3.
 - Fine-tune một phần encoder. **Mặc định là không làm.** Nếu làm: chạy với
@@ -277,13 +320,14 @@ bằng `scripts/run_sweep.py` với danh sách đã chuẩn bị ở cuối Bư�
   lần chỉ đổi một yếu tố so với mô hình tốt nhất hiện tại.
 - Chỉ số so sánh: CIDEr val với beam 3 là chính, BLEU-4 là phụ. Không dùng METEOR để so sánh.
 - Sàng lọc bằng một seed (42). Các ứng viên sát nhau chạy lại ba seed (42, 43, 44) và báo trung
-  bình ± độ lệch chuẩn. Một chênh lệch chỉ được coi là thật khi vượt hai lần độ lệch chuẩn và
-  vượt 0,01 CIDEr.
+  bình ± độ lệch chuẩn. Một chênh lệch chỉ được coi là thật khi vượt hai lần độ lệch chuẩn (của
+  cấu hình đang được so; với `attention_siglip_b16` là 0,012) và vượt 0,01 CIDEr.
 - Luôn báo kèm số tham số, thời gian huấn luyện, VRAM đỉnh và các chỉ số canh độ tự nhiên.
 
 ### Chọn mô hình cuối
 
-1. CIDEr val (beam 3) trung bình ba seed cao nhất, BLEU-4 không kém hơn ngoài mức nhiễu.
+1. CIDEr val (beam 3) trung bình ba seed cao nhất. BLEU-4 là chỉ số phụ, luôn báo kèm, nhưng
+   không dùng để loại một ứng viên khi chênh CIDEr còn nằm trong mức nhiễu.
 2. Qua kiểm tra độ tự nhiên (xem Bước 6).
 3. Suy luận chạy được trong 6 GB VRAM và trên CPU; tái lập được từ YAML và seed.
 4. Sau đó mới chạy tập test **một lần** (`--final`) với cách giải mã đã chốt trên val. Điểm test
