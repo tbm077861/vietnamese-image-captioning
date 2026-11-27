@@ -142,6 +142,19 @@ nạp gói `vic` đã cài (bản editable của repo chính).
 
 Trên Windows, khi in tiếng Việt ra console bị lỗi mã hóa thì thêm `-X utf8` sau `python`.
 
+Trên máy phát triển (16 GB RAM, thường chỉ còn khoảng 5 GB trống), chạy huấn luyện như sau:
+
+```powershell
+$env:OMP_NUM_THREADS = 1   # PowerShell; bash: export OMP_NUM_THREADS=1
+python -I -X utf8 scripts/run_sweep.py configs/a.yaml --set data.feature_access=read
+```
+
+- `data.feature_access=read` đọc cache bằng lệnh đọc file thay vì ánh xạ bộ nhớ, nên tiến trình
+  không giữ 2,5 GB cache trong working set.
+- `OMP_NUM_THREADS=1` tránh để các luồng OpenMP quay chờ làm chậm việc nạp dữ liệu.
+
+Kết quả không đổi (xem DESIGN.md, mục 6).
+
 ## Quy ước code
 
 - Mã nguồn chính nằm trong gói `vic` (`src/vic/`); `scripts/` chỉ chứa điểm vào dòng lệnh mỏng.

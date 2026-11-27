@@ -326,3 +326,21 @@ Run 09 (mức âm tiết) và run 10 (`min_freq` 5) có dữ liệu riêng trong
 con từ chối chạy nếu repo không phải bản checkout sạch, nên mọi kết quả gắn với một commit. Bảng
 thí nghiệm chỉ được sinh lại một lần, sau run cuối. Mọi lượt huấn luyện chạy nền, lần lượt từng
 run, có đo RAM và dừng khi RAM trống của máy xuống dưới 1,0 GB.
+
+**Đọc cache và luồng CPU.** Ở Bước 5, máy phát triển chỉ còn khoảng 5 GB RAM trống, so với 6–7 GB
+ở Bước 3–4. Khi cache được ánh xạ vào bộ nhớ, tiến trình huấn luyện phình tới 4–5,5 GB (số đo
+ở Bước 3–4), nên với khoảng 5 GB trống thì RAM trống sẽ xuống dưới ngưỡng 1,0 GB. Thử thêm giới
+hạn working set cứng 3–3,5 GB thì mỗi bước của Transformer mất khoảng 200 ms thay vì 46 ms. Đo riêng vòng nạp dữ liệu của `attention_siglip_b16`
+(lô 128 cặp, không huấn luyện) để tìm nguyên nhân:
+
+| Cách chạy | ms mỗi lô |
+|---|---:|
+| ánh xạ bộ nhớ, luồng OpenMP mặc định | 140–200 |
+| đọc file, luồng OpenMP mặc định | 160–180 |
+| đọc file, `KMP_BLOCKTIME=0` | 55 |
+| đọc file, `OMP_NUM_THREADS=1` | 32 |
+
+Nguyên nhân chính là các luồng OpenMP quay chờ sau mỗi phép song song và làm chậm chính các thao
+tác chép dữ liệu. Vì vậy, từ Bước 5 mọi run chạy với `OMP_NUM_THREADS=1` (`summary.json` ghi
+`cpu_threads`) và với override `data.feature_access=read` (ghi trong cấu hình của run). Giá trị
+đọc được giống hệt; có test kiểm tra rằng huấn luyện với hai cách đọc cho trọng số giống hệt.

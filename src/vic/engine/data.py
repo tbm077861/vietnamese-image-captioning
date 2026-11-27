@@ -43,7 +43,11 @@ def load_experiment_data(config: dict, vocab: Vocabulary | None = None) -> Exper
     data_config = config.get("data", {})
     use_features = bool(data_config.get("use_cached_features", True))
     if use_features:
-        store = FeatureStore(paths.features_dir, bool(data_config.get("features_in_memory", False)))
+        store = FeatureStore(
+            paths.features_dir,
+            in_memory=bool(data_config.get("features_in_memory", False)),
+            access=str(data_config.get("feature_access", "mmap")),
+        )
         missing = [r["image_id"] for r in images if r["image_id"] not in store]
         if missing:
             raise RuntimeError(
