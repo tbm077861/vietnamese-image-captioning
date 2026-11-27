@@ -2,6 +2,7 @@
 
 import copy
 import json
+import pickle
 
 import numpy as np
 import pytest
@@ -106,6 +107,40 @@ def test_feature_store_round_trip(toy_config):
     assert len(store) == 24 and "5" in store and "99" not in store
     feature = store["5"]
     assert feature.shape == (4, 2048) and feature.dtype == torch.float16
+
+
+def test_every_feature_access_returns_the_same_values(toy_config):
+    directory = data_paths(toy_config).features_dir
+    mapped = FeatureStore(directory, access="mmap")
+    read = FeatureStore(directory, access="read")
+    others = [read, FeatureStore(directory, in_memory=True)]
+    others.append(pickle.loads(pickle.dumps(read)))  # e.g. a DataLoader worker
+    for image_id in reversed(mapped.image_ids):  # any order: reads seek to their row
+        expected = mapped[image_id]
+        for store in others:
+            feature = store[image_id]
+            assert feature.dtype == torch.float16 and torch.equal(feature, expected)
+    read.close()
+    assert torch.equal(read["3"], mapped["3"])  # reopened after close
+    for store in (read, others[-1]):
+        store.close()
+    with pytest.raises(ValueError, match="feature access"):
+        FeatureStore(directory, access="stream")
+
+
+def test_training_is_identical_with_file_reads_and_memory_mapping(toy_config):
+    summaries, weights = [], []
+    for access in ("mmap", "read"):
+        config = copy.deepcopy(toy_config)
+        config["run_name"] = f"tiny_{access}"
+        config["data"] = {**config["data"], "features_in_memory": False, "feature_access": access}
+        summaries.append(run_training(config))
+        best = _outputs(config) / config["run_name"] / "checkpoints" / "best.pt"
+        weights.append(load_checkpoint(best)["decoder"])
+    assert summaries[0]["best_score"] == summaries[1]["best_score"]
+    assert summaries[0]["last_loss"] == summaries[1]["last_loss"]
+    for name, tensor in weights[0].items():
+        assert torch.equal(tensor, weights[1][name]), name
 
 
 def test_training_learns_checkpoints_and_evaluates(toy_config):
@@ -228,6 +263,7 @@ def test_summary_records_status_commit_and_time(toy_config):
     assert summary["parameter_count"] > 0 and summary["best_epoch"] >= 1
     assert summary["train_seconds"] >= partial["train_seconds"] > 0
     assert "git_commit" in summary and summary["init_from"] is None
+    assert summary["cpu_threads"] == torch.get_num_threads()
     assert summary["overrides"] is None
     assert [item["epoch"] for item in summary["resume_history"]] == [0]
     assert summary["resume_history"][0]["config_changes"] == []
@@ -243,6 +279,7 @@ def test_resume_records_config_changes(toy_config):
     (resume,) = summary["resume_history"]
     assert resume["epoch"] == 1 and resume["global_step"] == 4
     assert resume["config_changes"] == ["data.features_in_memory: True -> False"]
+    assert "git_commit" in resume  # the code a resumed run continued on
     rows = {row["run"]: row for row in collect_runs(_outputs(config), beam_size=2)}
     assert rows["tiny"]["resume_history"] == summary["resume_history"]
     table = "\n".join(experiments_table(list(rows.values()), beam_size=2))

@@ -217,6 +217,7 @@ def _train(
                 "epoch": progress["epoch"],
                 "global_step": progress["global_step"],
                 "config_changes": changes,
+                "git_commit": git_commit(),  # a resumed run may continue on newer code
             },
         ]
         if changes:
@@ -418,6 +419,7 @@ def _train(
         "steps_per_epoch": steps_per_epoch,
         "validation_seconds": validation_seconds,
         "estimated_epoch_minutes": epoch_minutes,
+        "cpu_threads": torch.get_num_threads(),  # intra-op threads (OMP_NUM_THREADS)
         "peak_vram_allocated_mb": None,
         "peak_vram_reserved_mb": None,
         "best_score": progress["best_score"],
