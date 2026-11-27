@@ -1,13 +1,16 @@
 """Tests for split assignment, caption preparation, datasets, collation and batching."""
 
+import pytest
 import torch
 
+from vic.config import data_paths
 from vic.data.annotations import make_record
 from vic.data.dataset import CaptionPairDataset, EpochBatchSampler, ImageDataset, collate_pairs
 from vic.data.prepare import (
     assign_missing_splits,
     build_vocabulary,
     caption_statistics,
+    check_output_is_new,
     tokenize_records,
 )
 from vic.text import CaptionTokenizer
@@ -18,6 +21,24 @@ def _records(count=20, split="train"):
         make_record(str(index), f"images/{index}.jpg", split, [f"Ảnh số {index}.", "Một con mèo!"])
         for index in range(count)
     ]
+
+
+def test_each_text_setting_has_its_own_directory_and_is_never_replaced_silently(tmp_path):
+    def paths(level, min_freq):
+        config = {"data_root": str(tmp_path), "dataset": {"name": "toy"}}
+        return data_paths({**config, "text": {"level": level, "min_freq": min_freq}})
+
+    base, syllable, rare = paths("word", 3), paths("syllable", 3), paths("word", 5)
+    assert len({base.processed_dir, syllable.processed_dir, rare.processed_dir}) == 3
+    assert base.annotations == syllable.annotations == rare.annotations  # read, never written
+    assert base.features_dir == syllable.features_dir  # the text setting shares the image cache
+    check_output_is_new(base)
+    base.processed_dir.mkdir(parents=True)
+    base.captions.write_text("{}", encoding="utf-8")
+    with pytest.raises(FileExistsError, match="--overwrite"):
+        check_output_is_new(base)
+    check_output_is_new(base, overwrite=True)
+    check_output_is_new(syllable)  # another setting is unaffected
 
 
 def test_missing_splits_are_carved_from_train_deterministically():

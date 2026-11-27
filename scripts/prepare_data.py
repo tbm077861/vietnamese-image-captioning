@@ -4,7 +4,8 @@ Usage:
     python scripts/prepare_data.py --config configs/baseline_lstm.yaml
 
 Reads the unified annotations written by download_data.py and writes captions.json, vocab.json
-and stats.json under data/processed/<dataset>/<text setting>/.
+and stats.json under data/processed/<dataset>/<text setting>/, one directory per text setting
+(level, min_freq). Existing files are never replaced unless --overwrite is given.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from vic.data.prepare import (
     assign_missing_splits,
     build_vocabulary,
     caption_statistics,
+    check_output_is_new,
     tokenize_records,
 )
 from vic.text.tokenizer import CaptionTokenizer
@@ -26,12 +28,14 @@ from vic.utils import setup_logging, write_json
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--config", required=True, help="experiment YAML file")
+    parser.add_argument("--overwrite", action="store_true", help="replace existing files")
     parser.add_argument("overrides", nargs="*", help="config overrides, e.g. text.level=syllable")
     args = parser.parse_args()
 
     logger = setup_logging()
     config = load_config(args.config, args.overrides)
     paths = data_paths(config)
+    check_output_is_new(paths, args.overwrite)
     text = config["text"]
     seed = int(config.get("seed", 42))
     split_config = config["dataset"].get("splits", {})

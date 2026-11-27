@@ -5,8 +5,23 @@ from __future__ import annotations
 import random
 import statistics
 
+from vic.config import DataPaths
 from vic.text.tokenizer import CaptionTokenizer
 from vic.text.vocab import Vocabulary
+
+
+def check_output_is_new(paths: DataPaths, overwrite: bool = False) -> None:
+    """Refuse to replace prepared captions or a vocabulary, which runs may be reading.
+
+    Each text setting (level, min_freq) has its own directory, so preparing a new setting never
+    touches the others; preparing an existing one again needs ``overwrite``.
+    """
+    existing = [str(path) for path in (paths.captions, paths.vocab) if path.exists()]
+    if existing and not overwrite:
+        raise FileExistsError(
+            f"{', '.join(existing)} already exist; runs may be using them. Pass --overwrite to "
+            "replace them."
+        )
 
 
 def assign_missing_splits(

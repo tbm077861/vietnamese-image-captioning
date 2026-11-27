@@ -258,8 +258,9 @@ epoch tối đa và luật dừng sớm như các run khác. Mỗi cấu hình c
 - **Chi phí:** VRAM đỉnh 778 MB trên ViT (LSTM attention 1.365 MB) và 637 MB trên ResNet-50; mỗi
   bước khoảng 46 ms với batch 64 (SigLIP), tức một epoch khoảng 30 giây, tương đương LSTM attention. Huấn
   luyện 6–16 phút vì dừng sớm hơn.
-- Vì Transformer kém rõ ở BLEU-4, tiêu chí chọn mô hình ("BLEU-4 không kém hơn ngoài mức
-  nhiễu") đã loại nó, nên không chạy thêm seed 43/44 cho Transformer.
+- Ban đầu Transformer bị loại vì BLEU-4 kém 2,4 điểm, nên không chạy seed 43/44. Chủ dự án đã
+  sửa lại: tiêu chí chọn là CIDEr val beam 3, và chênh 0,013 nằm trong mức nhiễu, nên bản dropout
+  0,3 được chạy thêm hai seed ở Bước 5 (mục "Tinh chỉnh (Bước 5)").
 
 **Cặp đề xuất: LSTM attention + SigLIP ViT-B/16** (`attention_siglip_b16`). CIDEr val cao nhất
 (0,6570 ± 0,0058; giải mã chốt 0,6713 ± 0,0052), BLEU-4 cao nhất (39,31 ± 0,11), 8,16 triệu
@@ -274,3 +275,54 @@ RAM của các run Bước 4, đo như ở Bước 3 (ngưỡng dừng 1,0 GB; k
 | `transformer` | 4,06 | 4,90 | 3,47 |
 | `transformer_clip_b16` | 3,91 | 5,11 | 2,23 |
 | `transformer_siglip_b16_dropout03` | 5,25 | 5,07 | 1,67 |
+
+### Tinh chỉnh (Bước 5)
+
+Chủ dự án duyệt Bước 5–6 ngày 28/11/2026. Mô hình nền là LSTM attention + SigLIP ViT-B/16
+(`attention_siglip_b16`). Cache đặc trưng float16 hiện có được giữ nguyên; việc cho ViT chạy
+float32 chuyển sang Bước 7 (tùy chọn).
+
+**Sửa lại kết luận Bước 4.** Tiêu chí chọn decoder là CIDEr val beam 3, không phải BLEU-4. Chênh
+0,013 giữa `transformer_siglip_b16_dropout03` (0,6437) và LSTM attention (0,6570 ± 0,0058) nằm
+trong mức nhiễu, nên bản Transformer này được chạy thêm seed 43 và 44, và decoder được chọn theo
+trung bình ba seed.
+
+**Luật đọc kết quả, ghi trước khi chạy lượt quét:**
+
+- Mỗi run trong `configs/sweeps/` (seed 42) được so cặp với `attention_siglip_b16` seed 42, có
+  CIDEr val beam 3 là 0,6557.
+- Một thay đổi **đáng xác nhận** khi CIDEr beam 3 của nó cao hơn gốc ít nhất **0,012**, tức đạt
+  từ 0,6677 trở lên.
+- Nếu chỉ một thay đổi vượt ngưỡng: chạy thêm seed 43 và 44 cho nó.
+- Nếu từ hai thay đổi trở lên: chạy seed 43 và 44 cho thay đổi tốt nhất, cộng một cấu hình gộp
+  hai thay đổi tốt nhất với ba seed. Tổng cộng tối đa 15 run.
+- Nếu không thay đổi nào vượt ngưỡng: giữ cấu hình gốc, không chạy xác nhận.
+- Mô hình thắng là cấu hình có CIDEr beam 3 trung bình ba seed cao nhất. Sau đó so các cách giải
+  mã của nó bằng `study_decoding.py`, có thêm lựa chọn chặn lặp 2-gram.
+
+**Vì sao ngưỡng đổi từ 0,033 thành 0,012.**
+
+- Ngưỡng 0,033 là hai lần độ lệch chuẩn giữa các seed của baseline ResNet-50 + LSTM (0,0164),
+  cấu hình nhiễu nhất của dự án.
+- `attention_siglip_b16` ổn định hơn gần ba lần (độ lệch chuẩn 0,0058 qua ba seed). Hai lần độ
+  lệch chuẩn của chính cấu hình được tinh chỉnh là 0,0115, làm tròn thành 0,012.
+- Nếu giữ 0,033, một thay đổi một yếu tố gần như không thể vượt ngưỡng, kể cả khi nó cải thiện
+  thật cỡ 0,01–0,03. Ngưỡng mới vẫn trên mức 0,01 của quy tắc chung.
+- Đây chỉ là ngưỡng sàng lọc. Hiệu của hai run một seed có độ lệch chuẩn khoảng
+  √2 × 0,0058 ≈ 0,008, nên trong 10 run vẫn có thể có một run vượt ngưỡng chỉ do nhiễu. Bước
+  xác nhận ba seed mới là bước quyết định.
+
+**Cách tách từ khi chấm điểm.** Mọi run được chấm trên cùng một cách tách:
+
+- câu tham chiếu là văn bản đã chuẩn hóa, tách theo khoảng trắng (âm tiết);
+- câu sinh ra được tách ngược về âm tiết ("sân_bóng" thành "sân bóng");
+- `<unk>` bị chặn khi giải mã.
+
+Run 09 (mức âm tiết) và run 10 (`min_freq` 5) có dữ liệu riêng trong
+`data/processed/uit_openviic/syllable_minfreq3/` và `.../word_minfreq5/`. `prepare_data.py` chỉ
+đọc `annotations.json` dùng chung và từ chối ghi đè thư mục đã có (trừ khi có `--overwrite`).
+
+**Hạ tầng.** Từ Bước 5, `run_sweep.py` chạy mỗi run trong một tiến trình con riêng, và tiến trình
+con từ chối chạy nếu repo không phải bản checkout sạch, nên mọi kết quả gắn với một commit. Bảng
+thí nghiệm chỉ được sinh lại một lần, sau run cuối. Mọi lượt huấn luyện chạy nền, lần lượt từng
+run, có đo RAM và dừng khi RAM trống của máy xuống dưới 1,0 GB.

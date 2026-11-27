@@ -108,20 +108,37 @@ python scripts/predict.py --checkpoint outputs/baseline_lstm/checkpoints/best.pt
 tensorboard --logdir outputs
 
 # Nhiều thí nghiệm: huấn luyện + đánh giá val (greedy, beam 3) + cập nhật bảng; chạy lại là resume
-python scripts/run_sweep.py configs/a.yaml configs/b.yaml
-python scripts/run_sweep.py configs/sweeps/                    # mọi *.yaml trong thư mục
-python scripts/run_sweep.py configs/baseline_lstm.yaml --seeds 42 43 44
+# Mỗi run chạy trong tiến trình riêng và chỉ chạy khi repo là bản checkout sạch (commit trước)
+python -I -X utf8 scripts/run_sweep.py configs/a.yaml configs/b.yaml
+python -I -X utf8 scripts/run_sweep.py configs/sweeps/          # mọi *.yaml trong thư mục
+python -I -X utf8 scripts/run_sweep.py configs/baseline_lstm.yaml --seeds 42 43 44
+python -I -X utf8 scripts/run_sweep.py configs/a.yaml --no-doc  # không sinh lại bảng ở cuối
 python scripts/update_experiments.py                           # sinh lại bảng docs/EXPERIMENTS.md
 python scripts/compare_runs.py --runs outputs/a outputs/b      # 50 ảnh val cố định, đọc bằng mắt
 
 # So các cách giải mã của một checkpoint trên val (beam, length penalty, điều kiện dừng, chặn lặp)
-python scripts/study_decoding.py --checkpoint outputs/attention_lstm/checkpoints/best.pt --no-repeat 0 3
+python scripts/study_decoding.py --checkpoint outputs/attention_lstm/checkpoints/best.pt --no-repeat 0 2 3
 ```
 
-`run_sweep.py` bỏ qua run đã xong (`summary.json` có `status: completed`), chạy tiếp run dở từ
-`last.pt`, ghi run lỗi vào bảng rồi đi tiếp; với `--seeds`, seed của file cấu hình giữ nguyên
-`run_name`, seed khác chạy thành `<run_name>_seed<N>`. Thư mục run tên `smoke*`, `debug*`,
-`tmp*` không vào bảng.
+`run_sweep.py` hoạt động như sau:
+
+- Bỏ qua run đã xong (`summary.json` có `status: completed`) và chạy tiếp run dở từ `last.pt`.
+- Ghi run lỗi vào bảng rồi đi tiếp.
+- Với `--seeds`, seed của file cấu hình giữ nguyên `run_name`; seed khác chạy thành
+  `<run_name>_seed<N>`.
+- Mỗi run chạy trong một tiến trình con (`python -I -X utf8 -m vic.engine.sweep`), nên bộ nhớ của
+  run trước được trả lại hết và một tiến trình bị giết chỉ làm mất run đó.
+- Tiến trình con từ chối chạy (mã thoát 3) nếu repo có file sửa, file đã stage hoặc file chưa theo
+  dõi mà không bị bỏ qua, hoặc nếu nó được chạy ngoài bản checkout chứa code của gói `vic`. Lượt
+  quét dừng ở lần từ chối đầu tiên.
+- Bảng `docs/EXPERIMENTS.md` chỉ được sinh lại một lần, sau run cuối. Cây làm việc vì thế sạch
+  suốt lượt quét; trước lượt quét kế tiếp phải commit hoặc bỏ thay đổi đó, hoặc dùng `--no-doc`.
+
+Thư mục run tên `smoke*`, `debug*`, `tmp*` không vào bảng. `prepare_data.py` ghi mỗi thiết lập văn
+bản (mức tách, `min_freq`) vào một thư mục riêng và không ghi đè thư mục đã có, trừ khi có
+`--overwrite`. `pytest` dùng `src/` của chính bản checkout (`pythonpath` trong `pyproject.toml`),
+nên test trong một git worktree kiểm tra đúng code của worktree đó. Script chạy bằng `-I` thì vẫn
+nạp gói `vic` đã cài (bản editable của repo chính).
 
 Trên Windows, khi in tiếng Việt ra console bị lỗi mã hóa thì thêm `-X utf8` sau `python`.
 
@@ -169,7 +186,9 @@ Trên Windows, khi in tiếng Việt ra console bị lỗi mã hóa thì thêm `
   - **Bước 4 xong** – decoder `transformer` (3 lớp, `d_model` 512). Một seed trên SigLIP, CLIP
     và ResNet-50: kém LSTM attention cùng encoder vì overfit sớm; bản dropout 0,3 trên SigLIP
     đạt 0,6437, vẫn kém và BLEU-4 thấp hơn 2,4 điểm. Cặp đề xuất: LSTM attention + SigLIP.
-    Danh sách 10 cấu hình cho Bước 5 trong `configs/sweeps/` (chưa chạy).
+    Danh sách 10 cấu hình cho Bước 5 trong `configs/sweeps/`.
+  - **Bước 5–6 đang làm** (duyệt 28/11/2026, xem ROADMAP). `run_sweep.py` đã chạy mỗi run trong
+    một tiến trình riêng và chỉ chạy trên bản checkout sạch.
 - **Quy tắc đánh giá:** chọn mô hình và tinh chỉnh chỉ dựa trên val; tập test chỉ dùng một lần
   để báo cáo mô hình cuối cùng.
 
@@ -181,8 +200,13 @@ Làm theo đúng thứ tự trong mục "Giai đoạn 5–6" của [ROADMAP.md](
 2. ~~Bước 2 – LSTM có attention và kiểm tra beam search~~ (xong).
 3. ~~Bước 3 – Encoder mạnh hơn~~ (xong, chọn SigLIP).
 4. ~~Bước 4 – Transformer decoder~~ (xong; danh sách cấu hình Bước 5 đã chuẩn bị).
-5. **Dừng và báo cáo** theo bốn mục nêu trong ROADMAP. Bước 5–7 chờ chủ dự án duyệt; trước
-   Bước 5 làm hai việc trong mục "Việc phải làm trước Bước 5" của ROADMAP.
+5. ~~Báo cáo sau Bước 4~~ (chủ dự án đã duyệt Bước 5–6).
+6. **Bước 5–6** theo năm việc trong mục "Bước 5–6: phạm vi đã duyệt" của ROADMAP:
+   - tách tiến trình (xong);
+   - ba seed của Transformer dropout 0,3;
+   - lượt quét Bước 5 và bước xác nhận;
+   - SCST trong một git worktree riêng, chỉ chạy thử ngắn;
+   - dừng và báo cáo.
 
 Sau mỗi bước: commit, mở Pull Request, cập nhật `docs/EXPERIMENTS.md`, `docs/ROADMAP.md` và hai
 mục "Trạng thái hiện tại", "Việc kế tiếp" của file này, rồi tự merge khi `pytest` và `ruff` qua.
@@ -209,9 +233,7 @@ là mất dòng tương ứng ở lần sinh bảng sau.
 
 ### Việc còn dở
 
-- Trước Bước 5: tách tiến trình cho mỗi run trong `run_sweep.py` (hiện dùng chung một tiến
-  trình) và cho encoder ViT chạy float32 (xem "Việc phải làm trước Bước 5" trong
-  [ROADMAP.md](ROADMAP.md)).
+- Cho encoder ViT chạy float32 đã chuyển sang Bước 7 (tùy chọn); cache float16 hiện có được giữ.
 - Dừng sớm với ngưỡng 5 epoch có thể dừng trước khi hội tụ (seed 44 của baseline dừng ở epoch
   19); cân nhắc nới ngưỡng ở lượt tinh chỉnh (Bước 5).
 - Chưa có CI; chạy `pytest` và `ruff check .` trước mỗi lần mở Pull Request. Nên chạy test trên
@@ -240,4 +262,5 @@ là mất dòng tương ứng ở lần sinh bảng sau.
 - SCST: bản tối ưu CIDEr chỉ được chọn làm mô hình cuối nếu qua kiểm tra độ tự nhiên; nếu không,
   mô hình cuối là bản huấn luyện bằng cross-entropy.
 - Checkpoint: không công bố ở bất kỳ đâu.
-- Lượt quét siêu tham số (Bước 5): tối đa 15 run, chủ dự án tự chạy bằng `scripts/run_sweep.py`.
+- Lượt quét siêu tham số (Bước 5): tối đa 15 run bằng `scripts/run_sweep.py`, chạy nền từng run
+  một, có đo RAM. Luật đọc kết quả ghi trong `docs/EXPERIMENTS.md` trước khi chạy.

@@ -1,4 +1,8 @@
-"""Seeding, device selection and logging helpers."""
+"""Seeding, device selection, git checks and logging helpers.
+
+NumPy and PyTorch are imported inside the functions that need them, so that light processes
+(the parent of a sweep, the experiment table) can use this module without loading them.
+"""
 
 from __future__ import annotations
 
@@ -8,12 +12,16 @@ import random
 import subprocess
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import numpy as np
-import torch
+if TYPE_CHECKING:
+    import torch
 
 
 def set_seed(seed: int, deterministic: bool = False) -> None:
+    import numpy as np
+    import torch
+
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -43,7 +51,54 @@ def git_commit() -> str | None:
     return f"{commit}-dirty" if status else commit or None
 
 
+def _git_toplevel(directory: Path) -> Path | None:
+    try:
+        output = subprocess.run(
+            ["git", "-C", str(directory), "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", check=True,
+        ).stdout.strip()  # fmt: skip
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return Path(output).resolve() if output else None
+
+
+def worktree_problem(
+    code_dir: str | Path | None = None, work_dir: str | Path | None = None
+) -> str | None:
+    """Why a run must not start from here, or None when it may.
+
+    A run may start only when its results can be tied to one commit: ``work_dir`` (default: the
+    working directory, where configs are read) must lie in the git checkout that ``code_dir``
+    (default: this package, i.e. the code that will run) comes from, and that checkout must have
+    no modified, staged or untracked file. Ignored files (data, outputs) do not count.
+    """
+    code_dir = Path(code_dir) if code_dir is not None else Path(__file__).resolve().parent
+    work_dir = Path(work_dir) if work_dir is not None else Path.cwd()
+    code_root = _git_toplevel(code_dir)
+    if code_root is None:
+        return f"the code in {code_dir} is not in a git checkout (or git is unavailable)"
+    if _git_toplevel(work_dir) != code_root:
+        return (
+            f"the working directory {work_dir} is not in the checkout the code comes from "
+            f"({code_root}); start the run from that checkout"
+        )
+    try:
+        lines = subprocess.run(
+            ["git", "-C", str(code_root), "status", "--porcelain", "--untracked-files=normal"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", check=True,
+        ).stdout.splitlines()  # fmt: skip
+    except (OSError, subprocess.CalledProcessError) as error:
+        return f"git status failed in {code_root}: {error}"
+    if lines:
+        shown = "; ".join(line.strip() for line in lines[:10])
+        more = f" and {len(lines) - 10} more" if len(lines) > 10 else ""
+        return f"the working tree of {code_root} is not clean ({shown}{more}); commit first"
+    return None
+
+
 def get_device(name: str = "auto") -> torch.device:
+    import torch
+
     if name == "auto":
         name = "cuda" if torch.cuda.is_available() else "cpu"
     if name.startswith("cuda") and not torch.cuda.is_available():
